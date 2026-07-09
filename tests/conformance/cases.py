@@ -17,7 +17,7 @@ Expected-outcome schema (``*.expected.yaml`` / ``expected.yaml``)::
     outcome: invalid        # required: valid | invalid
     match: exact            # optional: exact | superset (default exact)
     errors:                 # required iff outcome == invalid
-      - code: unknown_key   # required; must be a member of ofplang.errors.ERROR_CODES
+      - code: unknown_key   # required; must be a member of ofplang.validate.errors.ERROR_CODES
         path: "..."         # optional location hint (not matched by default)
     pending: "reason"       # optional: this case documents behavior the validator
                             #   does not satisfy yet (spec area not implemented, or a
@@ -33,7 +33,7 @@ from pathlib import Path
 
 import yaml
 
-from ofplang.errors import ERROR_CODES
+from ofplang.validate.errors import ERROR_CODES
 
 VALID = "valid"
 INVALID = "invalid"
@@ -108,7 +108,7 @@ def _build_case(case_id: str, root_doc: Path, expected_path: Path) -> Case:
         if code not in ERROR_CODES:
             raise CaseError(
                 f"[{case_id}] unknown error code {code!r}; "
-                f"add it to ofplang.errors if it is a real spec error"
+                f"add it to ofplang.validate.errors if it is a real spec error"
             )
         codes.append(code)
 

@@ -12,9 +12,9 @@ the object/graph layer where the full node graph is available.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 def check_entry(doc: YNode, diags: Diagnostics) -> None:

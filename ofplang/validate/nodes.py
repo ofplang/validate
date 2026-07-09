@@ -18,11 +18,11 @@ by these node-local rules plus the target processes' completeness.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.objects import ProcSig
-from ofplang.types import Atom
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.objects import ProcSig
+from ofplang.validate.types import Atom
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 def _mode_of(entry: YNode | None) -> str | None:

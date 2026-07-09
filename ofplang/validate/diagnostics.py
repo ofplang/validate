@@ -7,13 +7,13 @@ instead of raising lets one document surface several independent violations and
 lets each pass keep going after a non-fatal error.
 
 This module is a thin sink around the public ``Diagnostic``/``ValidationResult``
-types defined in :mod:`ofplang.validator`, so the API surface the tests depend on
+types defined in :mod:`ofplang.validate.validator`, so the API surface the tests depend on
 stays in one place.
 """
 
 from __future__ import annotations
 
-from ofplang.validator import Diagnostic, ValidationResult
+from ofplang.validate.validator import Diagnostic, ValidationResult
 
 
 class Diagnostics:

@@ -10,9 +10,9 @@ conformance to its declared type.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import (
     PRIMITIVE_TYPES,
     ArrayT,
     Atom,
@@ -23,7 +23,7 @@ from ofplang.types import (
     parse_type,
     resolve_error,
 )
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 def _is_primitive_only(expr: TypeExpr) -> bool:

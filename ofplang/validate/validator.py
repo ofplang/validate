@@ -10,7 +10,7 @@ The stable API surface the tests depend on is:
 
 where ``source`` is a path to the root document (a ``.yaml`` file). The
 returned :class:`ValidationResult` exposes ``ok`` and ``diagnostics``. Each
-:class:`Diagnostic` carries a ``code`` drawn from :mod:`ofplang.errors`.
+:class:`Diagnostic` carries a ``code`` drawn from :mod:`ofplang.validate.errors`.
 
 Until the validator is implemented, ``validate`` raises
 :class:`NotImplementedError`; the conformance runner treats that as "pending
@@ -32,7 +32,7 @@ MODES = frozenset({STRICT, EXTENSION_TOLERANT})
 class Diagnostic:
     """A single validation finding.
 
-    ``code`` is a stable identifier from :mod:`ofplang.errors`. ``path`` is an
+    ``code`` is a stable identifier from :mod:`ofplang.validate.errors`. ``path`` is an
     optional human-oriented logical location (e.g. ``processes.main.inputs.x``).
     ``file``/``line``/``col`` are the source position when known (1-based); they
     are optional so passes that cannot supply a node position still work.
@@ -95,26 +95,26 @@ def validate(
     """
     # Imported lazily so this module has no import-time dependency on PyYAML or
     # the pass modules — keeps the public API cheap to import.
-    from ofplang.diagnostics import Diagnostics
-    from ofplang.yamlnode import YamlError, YMap
-    from ofplang.imports import load_expanded
-    from ofplang import shape as shape_pass
-    from ofplang import identifiers as identifiers_pass
-    from ofplang import entry as entry_pass
-    from ofplang import typecheck as typecheck_pass
-    from ofplang import traits as traits_pass
-    from ofplang import views as views_pass
-    from ofplang import phases as phases_pass
-    from ofplang import features as features_pass
-    from ofplang import objects as objects_pass
-    from ofplang import generics as generics_pass
-    from ofplang import script as script_pass
-    from ofplang import nodes as nodes_pass
-    from ofplang import contracts as contracts_pass
-    from ofplang import scheduling as scheduling_pass
-    from ofplang import references as references_pass
-    from ofplang.objects import build_signatures
-    from ofplang.types import build_env
+    from ofplang.validate.diagnostics import Diagnostics
+    from ofplang.validate.yamlnode import YamlError, YMap
+    from ofplang.validate.imports import load_expanded
+    from ofplang.validate import shape as shape_pass
+    from ofplang.validate import identifiers as identifiers_pass
+    from ofplang.validate import entry as entry_pass
+    from ofplang.validate import typecheck as typecheck_pass
+    from ofplang.validate import traits as traits_pass
+    from ofplang.validate import views as views_pass
+    from ofplang.validate import phases as phases_pass
+    from ofplang.validate import features as features_pass
+    from ofplang.validate import objects as objects_pass
+    from ofplang.validate import generics as generics_pass
+    from ofplang.validate import script as script_pass
+    from ofplang.validate import nodes as nodes_pass
+    from ofplang.validate import contracts as contracts_pass
+    from ofplang.validate import scheduling as scheduling_pass
+    from ofplang.validate import references as references_pass
+    from ofplang.validate.objects import build_signatures
+    from ofplang.validate.types import build_env
 
     if mode not in MODES:
         raise ValueError(f"unknown validation mode: {mode!r}")
@@ -168,6 +168,6 @@ def validate(
 def _is_map(node) -> bool:
     # Small guard so identifier checking (which assumes a mapping root) is only
     # invoked on a well-formed root; a bad root was already reported by shape.
-    from ofplang.yamlnode import YMap
+    from ofplang.validate.yamlnode import YMap
 
     return isinstance(node, YMap)

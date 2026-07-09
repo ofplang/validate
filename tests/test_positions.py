@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ofplang import validate
-from ofplang.cli import main, EXIT_INVALID
+from ofplang.validate import validate
+from ofplang.validate.cli import main, EXIT_INVALID
 
 CASES = Path(__file__).parent / "conformance" / "cases"
 

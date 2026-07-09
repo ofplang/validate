@@ -55,7 +55,7 @@ mode: strict            # optional: strict | extension-tolerant (default: strict
 outcome: invalid        # required: valid | invalid
 match: exact            # optional: exact | superset (default: exact)
 errors:                 # required iff outcome == invalid
-  - code: unknown_type  # required; must exist in ofplang/errors.py
+  - code: unknown_type  # required; must exist in ofplang/validate/errors.py
     path: "processes.x" # optional location hint (not matched by default)
 pending: "reason"       # optional: see below
 notes: "why this is invalid, quoting the spec clause"   # optional
@@ -93,7 +93,7 @@ Codes are compared as **sets** (order- and duplicate-insensitive).
    Run-start/preflight and runtime-data errors (spec 6.2) are out of scope,
    except where the fact is statically known at graph phase (e.g. an empty
    literal Array feeding `mode: last`). Mark such cases in `notes`.
-5. **New error code?** Add it to `ofplang/errors.py` first — the runner rejects
+5. **New error code?** Add it to `ofplang/validate/errors.py` first — the runner rejects
    any code not in `ERROR_CODES`.
 
 ## Category map (spec section → cases directory)

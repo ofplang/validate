@@ -1,13 +1,16 @@
 """Command-line interface for the ofplang v0 validator.
 
-Intent: this is a thin presentation layer over :func:`ofplang.validate` — it
+Intent: this is a thin presentation layer over :func:`ofplang.validate.validate` — it
 does no validation itself, it only parses arguments, drives the library over one
 or more files, and renders results. Keeping all logic in the library means the
 CLI cannot drift from the conformance-tested behavior.
 
 Usage:
-    ofplang [--mode {strict,extension-tolerant}] [--format {text,json}]
-            [-q/--quiet] [--no-color] <file>...
+    ofp-validate [--mode {strict,extension-tolerant}] [--format {text,json}]
+                 [-q/--quiet] [--no-color] <file>...
+
+Also invocable as `python -m ofplang.validate`, and (once installed) as the
+`validate` subcommand of the umbrella `ofp` CLI.
 
 Exit codes (linter convention):
     0  every file is valid
@@ -22,8 +25,8 @@ import json
 import sys
 from pathlib import Path
 
-from ofplang import validate
-from ofplang.validator import STRICT, EXTENSION_TOLERANT, ValidationResult
+from ofplang.validate import validate
+from ofplang.validate.validator import STRICT, EXTENSION_TOLERANT, ValidationResult
 
 # Exit codes are part of the CLI contract (scripts/CI depend on them).
 EXIT_OK = 0
@@ -39,7 +42,7 @@ _RESET = "\033[0m"
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ofplang",
+        prog="ofp-validate",
         description="Validate ofplang v0 documents.",
     )
     parser.add_argument("paths", nargs="+", metavar="FILE", help="document(s) to validate")
@@ -150,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     missing = [p for p in args.paths if not Path(p).is_file()]
     if missing:
         for p in missing:
-            print(f"ofplang: cannot open {p!r}: no such file", file=sys.stderr)
+            print(f"ofp-validate: cannot open {p!r}: no such file", file=sys.stderr)
         return EXIT_USAGE
 
     # Validate each file via the library (the sole source of truth).

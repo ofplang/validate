@@ -9,10 +9,10 @@ pass, where type parameters are in scope.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import BUILTIN_TYPE_NAMES, TypeEnv
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import BUILTIN_TYPE_NAMES, TypeEnv
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 def check_traits(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:

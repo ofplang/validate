@@ -13,11 +13,11 @@ only inspects composite processes.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.objects import ProcSig
-from ofplang.validator import EXTENSION_TOLERANT
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.objects import ProcSig
+from ofplang.validate.validator import EXTENSION_TOLERANT
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 # Object-target rule per v0 preference kind (spec 23.4): gaps forbid an object
 # target, temperature requires one.

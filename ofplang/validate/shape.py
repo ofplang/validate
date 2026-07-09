@@ -17,10 +17,10 @@ position:
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.validator import EXTENSION_TOLERANT
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.validator import EXTENSION_TOLERANT
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 # Allowed top-level keys (spec 2, 2.3). Sections may be omitted; only
 # `processes` is semantically required (checked below).

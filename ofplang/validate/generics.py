@@ -20,10 +20,10 @@ from __future__ import annotations
 
 import re
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.objects import ProcSig
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.objects import ProcSig
+from ofplang.validate.types import (
     ArrayT,
     Atom,
     BUILTIN_TYPE_NAMES,
@@ -34,7 +34,7 @@ from ofplang.types import (
     parse_type,
     process_type_params,
 )
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 # A `where` constraint: TraitName<Param>, whitespace allowed only inside the
 # angle brackets (spec 8.1) — mirrors the type-expression whitespace rule.

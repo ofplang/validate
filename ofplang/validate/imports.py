@@ -3,7 +3,7 @@
 Intent: `$import` is *textual/structural* inclusion resolved before any other
 validation (spec 2.2 step 1) — it is not a module system. This module expands
 the node tree in place: mapping-position imports merge, sequence-position
-imports splice, and the result is validated as ordinary ofplang.
+imports splice, and the result is validated as ordinary ofplang.validate.
 
 Because every import failure mode (cycle, unreadable target, multi-document
 target, wrong root shape, empty/non-string path, URI fragment, duplicate key
@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ofplang import errors
-from ofplang.yamlnode import (
+from ofplang.validate import errors
+from ofplang.validate.yamlnode import (
     YMap,
     YScalar,
     YSeq,

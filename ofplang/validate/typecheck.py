@@ -10,9 +10,9 @@ that would otherwise need duplicated logic.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import (
     RESERVED_TYPE_LIKE,
     TypeEnv,
     TypeParseError,
@@ -20,7 +20,7 @@ from ofplang.types import (
     process_type_params,
     resolve_error,
 )
-from ofplang.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YNode
 
 
 def _check_type_field(

@@ -9,10 +9,10 @@ derived (required) feature and may list only v0-defined names.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.validator import EXTENSION_TOLERANT
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.validator import EXTENSION_TOLERANT
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 # The closed set of v0 feature names (spec 4.2).
 V0_FEATURES = frozenset(

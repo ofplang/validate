@@ -10,16 +10,16 @@ covers the per-port prohibition.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import (
     TypeEnv,
     TypeParseError,
     is_object_bearing,
     parse_type,
     process_type_params,
 )
-from ofplang.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YNode
 
 _PHASES = {"graph", "run", "data"}
 

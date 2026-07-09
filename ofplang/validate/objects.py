@@ -23,9 +23,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import (
     ArrayT,
     TypeEnv,
     TypeExpr,
@@ -34,7 +34,7 @@ from ofplang.types import (
     parse_type,
     process_type_params,
 )
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 # --- Per-process signature -------------------------------------------------

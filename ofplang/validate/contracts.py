@@ -20,9 +20,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.types import (
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.types import (
     ArrayT,
     Atom,
     PRIMITIVE_TYPES,
@@ -31,7 +31,7 @@ from ofplang.types import (
     TypeParseError,
     parse_type,
 )
-from ofplang.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
 class ContractError(Exception):

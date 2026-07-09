@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ofplang.cli import main, EXIT_OK, EXIT_INVALID, EXIT_USAGE
+from ofplang.validate.cli import main, EXIT_OK, EXIT_INVALID, EXIT_USAGE
 
 CASES = Path(__file__).parent / "conformance" / "cases"
 VALID = str(CASES / "shape" / "valid_minimal.yaml")

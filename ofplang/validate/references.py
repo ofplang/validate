@@ -21,10 +21,10 @@ reference resolution still applies to all node bindings.
 
 from __future__ import annotations
 
-from ofplang import errors
-from ofplang.diagnostics import Diagnostics
-from ofplang.objects import ProcSig
-from ofplang.yamlnode import YMap, YScalar, YNode
+from ofplang.validate import errors
+from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.objects import ProcSig
+from ofplang.validate.yamlnode import YMap, YScalar, YNode
 
 # Phase order graph < run < data (spec 6). Rank lets us compare "earlier".
 _PHASE_RANK = {"graph": 0, "run": 1, "data": 2}

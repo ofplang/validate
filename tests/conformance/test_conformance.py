@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from ofplang import validate
+from ofplang.validate import validate
 from tests.conformance.cases import (
     INVALID,
     MATCH_EXACT,

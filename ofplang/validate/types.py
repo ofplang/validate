@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ofplang.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YNode
 
 # Built-in primitive Data types (spec 7.1) and the reserved constructor/trait
 # names. `Numeric` is a trait, not a type, but shares the "reserved, cannot be
@@ -182,7 +182,7 @@ def resolve_error(expr: TypeExpr, env: TypeEnv, type_params: dict[str, str]) -> 
     type, or a type parameter of the current process (spec 2.5). `Numeric` and
     other unknown names do not resolve as types.
     """
-    from ofplang import errors
+    from ofplang.validate import errors
 
     if isinstance(expr, ArrayT):
         return resolve_error(expr.elem, env, type_params)

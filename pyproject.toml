@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ofplang"
+name = "ofplang-validate"
 version = "0.0.0"
-description = "Object-flow programming language v0 validator and tooling"
+description = "Object-flow programming language v0 validator"
 requires-python = ">=3.10"
 dependencies = ["PyYAML>=6.0"]
 
@@ -13,10 +13,16 @@ dependencies = ["PyYAML>=6.0"]
 test = ["pytest>=7.0"]
 
 [project.scripts]
-ofplang = "ofplang.cli:main"
+# Standalone command; the umbrella `ofp` CLI (separate repo) exposes this as
+# `ofp validate`.
+ofp-validate = "ofplang.validate.cli:main"
 
-[tool.setuptools]
-packages = ["ofplang"]
+# `ofplang` is a PEP 420 namespace shared across the org's repos (validate,
+# schedule, run, …); this distribution provides only the `ofplang.validate`
+# package under it.
+[tool.setuptools.packages.find]
+include = ["ofplang*"]
+namespaces = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
