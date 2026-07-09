@@ -1,0 +1,2 @@
+outcome: valid
+notes: "Whitespace is allowed immediately inside Array angle brackets: Array< Int > (spec 2.5)."

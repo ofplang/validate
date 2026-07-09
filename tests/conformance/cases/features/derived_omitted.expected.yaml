@@ -1,0 +1,2 @@
+outcome: valid
+notes: "features omitted -> derived from the body; kind: map needs node_map, which derivation supplies (spec 4.1)."

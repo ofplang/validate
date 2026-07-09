@@ -1,0 +1,28 @@
+spec_version: "0.0"
+processes:
+  inc:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      m:
+        type: Int
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
+    body:
+      nodes:
+        - id: mm
+          kind: map
+          process: inc
+          each:
+            n:
+              from: inputs.ns
+      returns: {}
+entry: main

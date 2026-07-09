@@ -98,6 +98,7 @@ IMPLICIT_CREATE = "implicit_create"
 IMPLICIT_DISCARD = "implicit_discard"
 OBJECTS_PATH_NOT_FOUND = "objects_path_not_found"
 DATA_INDEGREE = "data_indegree"
+OBJECT_VIA_BIND = "object_via_bind"
 
 # --- Transforms (spec 14.4) -----------------------------------------------
 UNKNOWN_TRANSFORM_KIND = "unknown_transform_kind"

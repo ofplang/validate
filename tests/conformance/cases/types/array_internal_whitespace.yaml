@@ -1,0 +1,10 @@
+spec_version: "0.0"
+processes:
+  main:
+    kind: atomic
+    inputs:
+      xs:
+        type: "Array< Int >"
+        phase: data
+    outputs: {}
+entry: main

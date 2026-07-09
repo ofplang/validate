@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: object_via_bind
+notes: "bind is Pure Data only; an Object-bearing value must use state (spec 11)."

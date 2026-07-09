@@ -83,6 +83,27 @@ def _source_phase(ref: tuple[str, str], sig: ProcSig, nodes_by_id, sigs) -> str 
     return None
 
 
+def _source_object_bearing(ref: tuple[str, str], sig: ProcSig, nodes_by_id, sigs) -> bool:
+    """Whether the value a reference denotes is Object-bearing.
+
+    Used to enforce that `bind` carries only Pure Data (spec 11): an Object
+    value must travel through `state`/`carry`/`args`/`each`, never `bind`.
+    Unresolvable sources default to False so this rule never fabricates an error
+    on top of an already-reported unknown reference.
+    """
+    owner, name = ref
+    if owner == "inputs":
+        port = sig.inputs.get(name)
+        return bool(port and port.object_bearing)
+    node = nodes_by_id.get(owner)
+    if isinstance(node, YMap):
+        proc = node.get("process")
+        if isinstance(proc, YScalar) and proc.text in sigs:
+            out = sigs[proc.text].outputs.get(name)
+            return bool(out and out.object_bearing)
+    return False
+
+
 def _check_composite(
     diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig, sigs: dict[str, ProcSig]
 ) -> None:
@@ -164,7 +185,19 @@ def _check_composite(
                 tgt_phase = None
                 if kind is None and target is not None and portname in target.inputs:
                     tgt_phase = target.inputs[portname].phase
-                _check_source_entry(entry, f"{base}.nodes.{nid}.{section}.{portname}", tgt_phase)
+                epath = f"{base}.nodes.{nid}.{section}.{portname}"
+                _check_source_entry(entry, epath, tgt_phase)
+
+                # `bind` is Pure Data only: an Object-bearing value must be
+                # routed through state/carry/args/each instead (spec 11). Only
+                # flag resolvable sources, so this never stacks on an unknown
+                # reference already reported above.
+                if section == "bind":
+                    frm = entry.get("from")
+                    if isinstance(frm, YScalar):
+                        ref = _parse_ref(frm.text)
+                        if ref and _resolves(ref) and _source_object_bearing(ref, sig, nodes_by_id, sigs):
+                            diags.add(errors.OBJECT_VIA_BIND, "Object-bearing value passed through bind", epath)
 
         # A branch condition is itself a body dataflow reference.
         if kind == "branch":
