@@ -3,10 +3,13 @@ compare the produced error codes against the case's expected outcome.
 
 Each case is a separate parametrized test so failures point at a single fixture.
 
-While the validator is unimplemented, ``validate`` raises ``NotImplementedError``
-and cases are reported as ``xfail`` ("pending implementation"). Set the env var
-``OFPLANG_STRICT_TESTS=1`` to turn that escape hatch off so a finished validator
-is held to the full contract (and any remaining ``NotImplementedError`` fails).
+The validator is fully implemented, so cases run for real. Two escape hatches
+remain for spec-first growth of the suite:
+  * a case in a category not listed in ``IMPLEMENTED_CATEGORIES`` is reported
+    ``xfail`` (lets a brand-new category's cases land before its pass does); and
+  * a case with a ``pending`` field is ``xfail`` regardless of mode.
+Set ``OFPLANG_STRICT_TESTS=1`` to ignore the category gate and hold every
+category to the full contract.
 """
 
 from __future__ import annotations
@@ -30,11 +33,11 @@ _STRICT = os.environ.get("OFPLANG_STRICT_TESTS") == "1"
 
 _CASES = discover_cases(CASES_ROOT) if CASES_ROOT.exists() else []
 
-# Categories whose validation passes are implemented. The validator is built
-# milestone by milestone; a case in a not-yet-implemented category is reported
-# xfail ("pending") rather than failed, so partial progress keeps a green suite.
-# Add categories here as their passes land. `OFPLANG_STRICT_TESTS=1` ignores
-# this gate and holds the whole suite to the full contract (final acceptance).
+# Categories with implemented validation passes. Every current category is
+# listed, so the gate is effectively a no-op today; it exists so a *new*
+# category's cases can be committed (spec-first) and xfail until its pass lands.
+# `OFPLANG_STRICT_TESTS=1` ignores this gate and holds the whole suite to the
+# full contract.
 IMPLEMENTED_CATEGORIES = {
     "shape",
     "metadata",
@@ -67,12 +70,14 @@ def _category(case: Case) -> str:
 def _run(case: Case):
     if not _STRICT and _category(case) not in IMPLEMENTED_CATEGORIES:
         pytest.xfail(f"category '{_category(case)}' not implemented yet")
+    # NotImplementedError is not expected from the finished validator; catching
+    # it is a safety net for a partially-built new pass during development.
     try:
         return validate(case.root_doc, mode=case.mode)
     except NotImplementedError:
         if _STRICT:
             raise
-        pytest.xfail("validator not implemented yet")
+        pytest.xfail("validator raised NotImplementedError")
 
 
 def _assert_outcome(case: Case, result) -> None:

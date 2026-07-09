@@ -1,20 +1,17 @@
-"""ofplang v0 validator -- public API contract.
+"""ofplang v0 validator -- public API.
 
-The implementation is intentionally a stub for now: the conformance test suite
-is authored first (test-driven development) and defines the behavioral contract
-that the real validator must satisfy.
-
-The stable API surface the tests depend on is:
+The stable API surface the tests and CLI depend on is:
 
     validate(source, *, mode="strict", base_dir=None) -> ValidationResult
 
 where ``source`` is a path to the root document (a ``.yaml`` file). The
 returned :class:`ValidationResult` exposes ``ok`` and ``diagnostics``. Each
-:class:`Diagnostic` carries a ``code`` drawn from :mod:`ofplang.validate.errors`.
+:class:`Diagnostic` carries a ``code`` drawn from :mod:`ofplang.validate.errors`
+plus an optional source position (``file``/``line``/``col``).
 
-Until the validator is implemented, ``validate`` raises
-:class:`NotImplementedError`; the conformance runner treats that as "pending
-implementation" (xfail) unless run in strict mode.
+``validate`` runs the passes in the spec's processing order (spec 2.2),
+collecting all independent findings; only a YAML parse or ``$import`` resolution
+failure is terminal.
 """
 
 from __future__ import annotations
@@ -89,9 +86,6 @@ def validate(
 
     The pipeline follows the spec's processing order (spec 2.2): load, then a
     sequence of passes each appending to a shared :class:`Diagnostics` sink.
-    Passes are added milestone by milestone; constructs handled by not-yet-built
-    passes simply go unchecked (their conformance cases are gated xfail in the
-    test harness until the owning pass lands).
     """
     # Imported lazily so this module has no import-time dependency on PyYAML or
     # the pass modules — keeps the public API cheap to import.

@@ -1,4 +1,4 @@
-"""ofplang v0 -- object-flow programming language tooling."""
+"""ofplang.validate -- validator for Object-flow Programming Language v0."""
 
 from ofplang.validate.validator import (
     Diagnostic,

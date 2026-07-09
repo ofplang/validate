@@ -1,8 +1,9 @@
 # ofplang v0 conformance test suite
 
-This suite pins the behavioral contract of the ofplang v0 validator **before**
-the validator is implemented (test-driven development). Each test case is a
-spec-derived example document paired with its expected validation outcome.
+This suite pins the behavioral contract of the ofplang v0 validator. Each test
+case is a spec-derived example document paired with its expected validation
+outcome. (It was authored test-first; the validator is now fully implemented and
+every case runs for real.)
 
 The tests assert on **stable error codes**, never on message strings, so they
 survive validator refactors and force invalid cases to fail *for the intended
@@ -15,10 +16,10 @@ pip install -e ".[test]"
 pytest
 ```
 
-While the validator is a stub (`validate` raises `NotImplementedError`), every
-case reports as `xfail` ("pending implementation"). Once implementation starts,
-each category flips to real assertions as it lands. To hold a finished validator
-to the full contract (so leftover `NotImplementedError`s fail):
+Two `xfail` escape hatches support growing the suite spec-first: a case in a
+category not yet in `IMPLEMENTED_CATEGORIES`, and a case carrying a `pending`
+field (see below). To ignore the category gate and hold every category to the
+full contract:
 
 ```
 OFPLANG_STRICT_TESTS=1 pytest
