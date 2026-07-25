@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: objects_path_not_found
+    path: "processes.bad.objects.transform[0].outputs.ys"
+  - code: incomplete_objects
+    path: "processes.bad.outputs.ys"
+notes: "A transform role path naming a non-existent port is objects_path_not_found (spec 14.4.1); the real output ys is then left without a provenance."

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: objects_path_not_found
+    path: "processes.bad.objects.consume"
+notes: "An objects path naming a non-existent port is a validation error (spec 14.4.1, 4.4). The real input sample is consumed, so its fate is complete and only the bad path is reported."

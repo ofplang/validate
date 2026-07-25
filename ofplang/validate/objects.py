@@ -198,6 +198,26 @@ def _validate_transform_entry(
         diags.add(errors.INVALID_TRANSFORM_ROLES, f"invalid roles for {kind}", base, at=entry)
         return
 
+    # 2.5 Every referenced path must name a declared port (spec 14.4.1, 4.4). A
+    # malformed or non-existent path is reported here and short-circuits the
+    # Object-bearing / typing checks, which cannot be judged against a path that
+    # does not resolve to a port.
+    any_missing = False
+    for role_map, side in ((in_roles, "inputs"), (out_roles, "outputs")):
+        for role, val in role_map.items():
+            if isinstance(val, YScalar):
+                parsed = _parse_path(val.text)
+                if parsed is None or parsed[1] not in (sig.inputs if parsed[0] == "inputs" else sig.outputs):
+                    diags.add(
+                        errors.OBJECTS_PATH_NOT_FOUND,
+                        f"objects path {val.text!r} does not name a declared port",
+                        f"{base}.{side}.{role}",
+                        at=val,
+                    )
+                    any_missing = True
+    if any_missing:
+        return
+
     # 3. Every referenced path must be Object-bearing (spec 14.4.1).
     all_ports_ob = True
     for role_map, side in ((in_roles, "inputs"), (out_roles, "outputs")):
@@ -272,6 +292,24 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
     fates: dict[str, int] = {n: 0 for n in obj_inputs}
     provs: dict[str, int] = {n: 0 for n in obj_outputs}
 
+    def _exists(parsed: tuple[str, str] | None) -> bool:
+        """Whether a parsed path names a declared port on the side it names.
+
+        A malformed path (``None``) or a path whose port is absent from the named
+        side's port map is an `objects_path_not_found` error (spec 14.4.1, 4.4).
+        A well-formed path to a real port on the *wrong* side is not "not found"
+        here; it simply fails to account for its Object slot and surfaces as an
+        incomplete fate/provenance below.
+        """
+        if parsed is None:
+            return False
+        side, port = parsed
+        ports = sig.inputs if side == "inputs" else sig.outputs
+        return port in ports
+
+    def _not_found(text: str, path: str, at) -> None:
+        diags.add(errors.OBJECTS_PATH_NOT_FOUND, f"objects path {text!r} does not name a declared port", path, at=at)
+
     if isinstance(objects, YMap):
         # map: outputs.X (provenance) <- inputs.Y (fate). Cross-wiring allowed.
         map_node = objects.get("map")
@@ -279,11 +317,15 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             for out_path in map_node.keys():
                 src = map_node.get(out_path)
                 op = _parse_path(out_path)
-                if op and op[0] == "outputs" and op[1] in provs:
+                if not _exists(op):
+                    _not_found(out_path, f"{base}.objects.map.{out_path}", map_node.key_node(out_path))
+                elif op[0] == "outputs" and op[1] in provs:
                     provs[op[1]] += 1
                 if isinstance(src, YScalar):
                     ip = _parse_path(src.text)
-                    if ip and ip[0] == "inputs" and ip[1] in fates:
+                    if not _exists(ip):
+                        _not_found(src.text, f"{base}.objects.map.{out_path}", src)
+                    elif ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
 
         # consume: input Object identities terminated here.
@@ -292,7 +334,9 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             for item in consume.items:
                 if isinstance(item, YScalar):
                     ip = _parse_path(item.text)
-                    if ip and ip[0] == "inputs" and ip[1] in fates:
+                    if not _exists(ip):
+                        _not_found(item.text, f"{base}.objects.consume", item)
+                    elif ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
 
         # create: new output Object identities.
@@ -301,7 +345,9 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             for item in create.items:
                 if isinstance(item, YScalar):
                     op = _parse_path(item.text)
-                    if op and op[0] == "outputs" and op[1] in provs:
+                    if not _exists(op):
+                        _not_found(item.text, f"{base}.objects.create", item)
+                    elif op[0] == "outputs" and op[1] in provs:
                         provs[op[1]] += 1
 
         # transform: validated in detail, and its Object ports counted once.

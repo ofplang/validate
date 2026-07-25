@@ -1,0 +1,27 @@
+spec_version: "0.0"
+types:
+  Sample:
+    domain: object
+processes:
+  bad:
+    kind: atomic
+    inputs:
+      xs:
+        type: Array<Sample>
+        phase: data
+    outputs:
+      ys:
+        type: Array<Sample>
+        phase: data
+    objects:
+      transform:
+        - kind: array_reverse
+          inputs:
+            xs: inputs.xs
+          outputs:
+            ys: outputs.typo
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main
