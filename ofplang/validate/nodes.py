@@ -25,12 +25,52 @@ from ofplang.validate.types import Atom
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
 
 
+# Valid output-control modes per structured node kind (spec 18.1, 19.1, 20.1).
+_FOLD_MODES = {"carry", "collect", "last", "drop"}
+_DO_WHILE_MODES = {"carry", "collect", "last", "drop"}
+_BRANCH_MODES = {"common", "drop"}
+
+
 def _mode_of(entry: YNode | None) -> str | None:
     if isinstance(entry, YMap):
         m = entry.get("mode")
         if isinstance(m, YScalar):
             return m.text
     return None
+
+
+def _check_output_modes(
+    diags: Diagnostics, outputs: YMap, allowed: set[str], nid: str, base: str
+) -> None:
+    """Every listed output mode must be one the kind allows (spec 18.1/19.1/20.1).
+
+    A missing mode is left to the (deferred) fully-explicit-listing rule; only a
+    present-but-unrecognized mode word is reported here.
+    """
+    for oname in outputs.keys():
+        mode = _mode_of(outputs.get(oname))
+        if mode is not None and mode not in allowed:
+            diags.add(
+                errors.INVALID_OUTPUT_MODE,
+                f"invalid output mode {mode!r} for {oname!r}",
+                f"{base}.nodes.{nid}.{oname}",
+                at=outputs.get(oname),
+            )
+
+
+def _check_carry_listed_as_carry(
+    diags: Diagnostics, node: YMap, outputs: YMap, nid: str, base: str
+) -> None:
+    """When `outputs` is present, every carry binding must be listed with
+    `mode: carry` (fold rule 2, do_while rule 2)."""
+    for cname in _carry_names(node):
+        if _mode_of(outputs.get(cname)) != "carry":
+            diags.add(
+                errors.CARRY_OUTPUT_NOT_CARRY_MODE,
+                f"carry {cname!r} must be listed with mode: carry",
+                f"{base}.nodes.{nid}.{cname}",
+                at=outputs.get(cname) or node,
+            )
 
 
 def _map_sources(proc_def: YMap) -> dict[str, str]:
@@ -121,6 +161,10 @@ def _check_fold_outputs(
 
     outputs = node.get("outputs")
     if isinstance(outputs, YMap):
+        # Modes must be valid for fold, and every carry binding must be listed
+        # with mode: carry (spec 18.1 rules 1-2).
+        _check_output_modes(diags, outputs, _FOLD_MODES, nid, base)
+        _check_carry_listed_as_carry(diags, node, outputs, nid, base)
         # An Object-bearing output must not be dropped or reduced to `last`;
         # it may only be carried or collected (spec 18.1 rule 7).
         for oname in outputs.keys():
@@ -163,6 +207,13 @@ def _check_do_while_outputs(
             f"{base}.nodes.{nid}.{oname}",
             at=node,
         )
+
+    # When `outputs` is present, modes must be valid for do_while and every carry
+    # binding must be listed with mode: carry (spec 19.1 rules 1-2).
+    outputs = node.get("outputs")
+    if isinstance(outputs, YMap):
+        _check_output_modes(diags, outputs, _DO_WHILE_MODES, nid, base)
+        _check_carry_listed_as_carry(diags, node, outputs, nid, base)
 
     # condition.output must name a Boolean Data output of the target (spec 19).
     cond = node.get("condition")
@@ -226,6 +277,22 @@ def _check_branch(
             f"{base}.nodes.{nid}.{name}",
             at=node,
         )
+
+    # When `outputs` is present, modes must be valid for branch, and `mode: drop`
+    # may be used only for Data outputs -- an Object-bearing output must be
+    # exposed as common, never dropped (spec 20.1 rules 6-7).
+    outputs = node.get("outputs")
+    if isinstance(outputs, YMap):
+        _check_output_modes(diags, outputs, _BRANCH_MODES, nid, base)
+        arm_obj = then_obj | else_obj
+        for oname in outputs.keys():
+            if oname in arm_obj and _mode_of(outputs.get(oname)) == "drop":
+                diags.add(
+                    errors.OBJECT_OUTPUT_BAD_MODE,
+                    f"Object output {oname!r} cannot use drop",
+                    f"{base}.nodes.{nid}.{oname}",
+                    at=outputs.get(oname),
+                )
 
     # Identity-equivalence for outputs common to both arms (spec 20.2): each arm
     # must derive the output from the *same* branch argument via an identity map.

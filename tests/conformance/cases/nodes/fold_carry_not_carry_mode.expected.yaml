@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: carry_output_not_carry_mode
+    path: "main.body.nodes.loop.acc"
+notes: "When outputs is present, every carry binding must be listed with mode: carry (spec 18.1 rule 2)."

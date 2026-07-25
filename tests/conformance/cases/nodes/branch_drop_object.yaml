@@ -1,0 +1,46 @@
+spec_version: "0.0"
+features:
+  - node_branch
+types:
+  Cup:
+    domain: object
+processes:
+  wash:
+    kind: atomic
+    inputs:
+      cup: {type: Cup, phase: data}
+    outputs:
+      cup: {type: Cup, phase: data}
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  polish:
+    kind: atomic
+    inputs:
+      cup: {type: Cup, phase: data}
+    outputs:
+      cup: {type: Cup, phase: data}
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  main:
+    kind: composite
+    inputs:
+      cup: {type: Cup, phase: data}
+      dirty: {type: Bool, phase: data}
+    body:
+      nodes:
+        - id: handle
+          kind: branch
+          condition:
+            from: inputs.dirty
+          args:
+            cup: {from: inputs.cup}
+          then:
+            process: wash
+          else:
+            process: polish
+          outputs:
+            cup: {mode: drop}
+      returns: {}
+entry: main

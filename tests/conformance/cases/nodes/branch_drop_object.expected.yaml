@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: object_output_bad_mode
+    path: "main.body.nodes.handle.cup"
+notes: "mode: drop may be used only for Data outputs; an Object-bearing branch output must be common (spec 20.1 rules 6-7)."
