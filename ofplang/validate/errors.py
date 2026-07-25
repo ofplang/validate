@@ -94,11 +94,13 @@ OBJECT_OUTPUT_UNUSED = "object_output_unused"
 OBJECT_FANOUT = "object_fanout"
 OBJECT_INPUT_NO_SOURCE = "object_input_no_source"
 OBJECT_INPUT_MULTI_SOURCE = "object_input_multi_source"
+# A missing fate (input) or provenance (output) -- i.e. an implicit Object
+# discard or creation (spec 13.1) -- is reported with the single
+# `incomplete_objects` code (the spec's §4.4 error name); there are no separate
+# implicit_create / implicit_discard codes.
 INCOMPLETE_OBJECTS = "incomplete_objects"
 MULTIPLE_FATES = "multiple_fates"
 MULTIPLE_PROVENANCES = "multiple_provenances"
-IMPLICIT_CREATE = "implicit_create"
-IMPLICIT_DISCARD = "implicit_discard"
 OBJECTS_PATH_NOT_FOUND = "objects_path_not_found"
 DATA_INDEGREE = "data_indegree"
 OBJECT_VIA_BIND = "object_via_bind"
@@ -121,6 +123,10 @@ OBJECT_OUTPUT_BAD_MODE = "object_output_bad_mode"
 NONCARRY_OBJECT_OUTPUT_UNLISTED = "noncarry_object_output_unlisted"
 LAST_ON_EMPTY_FOLD = "last_on_empty_fold"
 ZIP_MISMATCH = "zip_mismatch"
+# A spec §4.4 / §14.4.2 graph-phase error (array_uncons on an Array known empty
+# at graph phase). Kept as a defined code, but not currently emitted: at this
+# pass's port-level granularity an input Array's emptiness is not known at graph
+# phase, so the condition is left to the run/data phases.
 ARRAY_UNCONS_EMPTY = "array_uncons_empty"
 MISSING_MAX_ITERATIONS = "missing_max_iterations"
 BAD_CONDITION_OUTPUT = "bad_condition_output"
