@@ -17,6 +17,8 @@ position:
 
 from __future__ import annotations
 
+import re
+
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.validator import EXTENSION_TOLERANT
@@ -179,14 +181,14 @@ def _check_spec_version(diags: Diagnostics, doc: YMap) -> None:
     if node is None:
         return  # omission is allowed in v0
     if not isinstance(node, YScalar) or node.is_null:
-        return
-    text = node.text
-    parts = text.split(".")
-    ok = len(parts) == 2 and all(p.isdigit() for p in parts)
-    if not ok:
+        return  # a null was already reported by the null scan
+    # Must be a *string* scalar of the form MAJOR.MINOR (spec 2.1). A non-string
+    # scalar (e.g. the YAML float `0.0`, tagged float not str) is malformed, as is
+    # any non-two-number shape. Digits are ASCII only (`\d` under re.ASCII).
+    if not node.is_str or re.fullmatch(r"\d+\.\d+", node.text, re.ASCII) is None:
         diags.add(
             errors.MALFORMED_SPEC_VERSION,
-            f"spec_version must be MAJOR.MINOR, got {text!r}",
+            f"spec_version must be a MAJOR.MINOR string, got {node.text!r}",
             "spec_version",
             at=node,
         )

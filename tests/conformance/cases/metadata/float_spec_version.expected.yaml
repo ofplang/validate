@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: malformed_spec_version
+    path: "spec_version"
+notes: "spec_version must be a string; the YAML float 0.0 is malformed (spec 2.1)."
