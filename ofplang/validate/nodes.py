@@ -73,6 +73,25 @@ def _check_carry_listed_as_carry(
             )
 
 
+def _check_all_outputs_listed(
+    diags: Diagnostics, outputs: YMap, target: ProcSig, nid: str, base: str
+) -> None:
+    """When `outputs` is present, it is fully explicit: every target process
+    output must be listed (fold rule 10, do_while rule 18). This includes the
+    do_while condition output, which is an ordinary Data output listed with
+    collect/last/drop; only when `outputs` is omitted is it dropped by default
+    (spec 19.2)."""
+    listed = set(outputs.keys())
+    for oname in sorted(target.outputs):
+        if oname not in listed:
+            diags.add(
+                errors.OUTPUT_NOT_LISTED,
+                f"target output {oname!r} must be listed when outputs is present",
+                f"{base}.nodes.{nid}.{oname}",
+                at=outputs,
+            )
+
+
 def _map_sources(proc_def: YMap) -> dict[str, str]:
     """For an arm process, map output port -> input port it identity-maps from.
 
@@ -161,10 +180,11 @@ def _check_fold_outputs(
 
     outputs = node.get("outputs")
     if isinstance(outputs, YMap):
-        # Modes must be valid for fold, and every carry binding must be listed
-        # with mode: carry (spec 18.1 rules 1-2).
+        # Modes must be valid for fold, every carry binding must be listed with
+        # mode: carry, and the section is fully explicit (spec 18.1 rules 1-2, 10).
         _check_output_modes(diags, outputs, _FOLD_MODES, nid, base)
         _check_carry_listed_as_carry(diags, node, outputs, nid, base)
+        _check_all_outputs_listed(diags, outputs, target, nid, base)
         # An Object-bearing output must not be dropped or reduced to `last`;
         # it may only be carried or collected (spec 18.1 rule 7).
         for oname in outputs.keys():
@@ -209,11 +229,16 @@ def _check_do_while_outputs(
         )
 
     # When `outputs` is present, modes must be valid for do_while and every carry
-    # binding must be listed with mode: carry (spec 19.1 rules 1-2).
+    # binding must be listed with mode: carry (spec 19.1 rules 1-2). The section
+    # is fully explicit -- every target output, including the condition output --
+    # but only "otherwise": a non-carry Object output already makes the node
+    # invalid (rule 18), so we do not also demand it be listed.
     outputs = node.get("outputs")
     if isinstance(outputs, YMap):
         _check_output_modes(diags, outputs, _DO_WHILE_MODES, nid, base)
         _check_carry_listed_as_carry(diags, node, outputs, nid, base)
+        if not noncarry_obj:
+            _check_all_outputs_listed(diags, outputs, target, nid, base)
 
     # condition.output must name a Boolean Data output of the target (spec 19).
     cond = node.get("condition")

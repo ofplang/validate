@@ -34,5 +34,7 @@ processes:
           outputs:
             score:
               mode: carry
+            continue:
+              mode: drop
       returns: {}
 entry: main

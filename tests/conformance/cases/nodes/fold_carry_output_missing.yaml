@@ -38,5 +38,7 @@ processes:
           outputs:
             score:
               mode: carry
+            total:
+              mode: collect
       returns: {}
 entry: main

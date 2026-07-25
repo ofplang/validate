@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: output_not_listed
+    path: "main.body.nodes.loop.reading"
+notes: "When outputs is present it is fully explicit: the non-carry output 'reading' must be listed (fold rule 10)."

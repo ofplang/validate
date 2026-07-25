@@ -36,5 +36,7 @@ processes:
           outputs:
             n:
               mode: carry
+            status:
+              mode: drop
       returns: {}
 entry: main

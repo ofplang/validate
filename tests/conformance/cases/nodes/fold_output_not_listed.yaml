@@ -1,0 +1,30 @@
+spec_version: "0.0"
+features:
+  - node_fold
+processes:
+  measure:
+    kind: atomic
+    inputs:
+      acc: {type: Float, phase: data}
+      item: {type: Float, phase: data}
+    outputs:
+      acc: {type: Float, phase: data}
+      reading: {type: Float, phase: data}
+  main:
+    kind: composite
+    inputs:
+      init: {type: Float, phase: data}
+      items: {type: Array<Float>, phase: data}
+    body:
+      nodes:
+        - id: loop
+          kind: fold
+          process: measure
+          carry:
+            acc: {from: inputs.init}
+          each:
+            item: {from: inputs.items}
+          outputs:
+            acc: {mode: carry}
+      returns: {}
+entry: main
