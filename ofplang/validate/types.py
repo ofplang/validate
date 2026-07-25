@@ -53,6 +53,14 @@ class TypeParseError(Exception):
     """Malformed type expression (maps to `malformed_type_expr`)."""
 
 
+class ArrayArityError(TypeParseError):
+    """`Array` given other than exactly one argument (maps to `array_arity`).
+
+    A subclass of `TypeParseError`, so callers that only care about "unparsable"
+    (e.g. Object-tracking's port-type resolver) still catch it; callers that want
+    the precise code (the type pass) catch this first."""
+
+
 # --- Parser ---------------------------------------------------------------
 class _Parser:
     """Character-level recursive-descent parser for a single type expression.
@@ -90,12 +98,16 @@ class _Parser:
                 raise TypeParseError("Array must be immediately followed by '<'")
             self.i += 1  # consume '<'
             self._skip_inner_ws()
+            # `Array<>` (no argument) is an arity error, distinct from a malformed
+            # inner type: Array has arity exactly one.
+            if self._peek() == ">":
+                raise ArrayArityError("Array takes exactly one argument")
             elem = self.parse_expr()  # exactly one argument (recursion handles nesting)
             self._skip_inner_ws()
             # Anything other than the closing '>' here (e.g. a comma) means a
             # second type argument or junk: Array has arity exactly one.
             if self._peek() != ">":
-                raise TypeParseError("Array takes exactly one argument")
+                raise ArrayArityError("Array takes exactly one argument")
             self.i += 1  # consume '>'
             return ArrayT(elem)
         # A bare `Array` (no `<`) fell through above; any other identifier is an

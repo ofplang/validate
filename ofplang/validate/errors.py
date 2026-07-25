@@ -34,6 +34,8 @@ DUPLICATE_PORT_NAME = "duplicate_port_name"
 # --- Type expressions (spec 2.5, 7.1) -------------------------------------
 UNKNOWN_TYPE = "unknown_type"
 MALFORMED_TYPE_EXPR = "malformed_type_expr"
+# `Array` given other than exactly one type argument, e.g. `Array<>` or
+# `Array<Int, Sample>` (spec 2.5). Distinct from the general malformed_type_expr.
 ARRAY_ARITY = "array_arity"
 REDECLARE_BUILTIN = "redeclare_builtin"
 TYPE_PARAM_SHADOW = "type_param_shadow"

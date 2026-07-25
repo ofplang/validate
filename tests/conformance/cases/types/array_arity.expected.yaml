@@ -1,5 +1,5 @@
 outcome: invalid
 errors:
-  - code: malformed_type_expr
+  - code: array_arity
     path: "processes.main.inputs.x.type"
-notes: "Array requires exactly one type argument; multiple args are invalid (spec 2.5)."
+notes: "Array requires exactly one type argument; multiple args are an arity error (spec 2.5)."

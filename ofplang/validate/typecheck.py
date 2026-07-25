@@ -14,6 +14,7 @@ from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.types import (
     RESERVED_TYPE_LIKE,
+    ArrayArityError,
     TypeEnv,
     TypeParseError,
     parse_type,
@@ -45,6 +46,12 @@ def _check_type_field(
         return
     try:
         expr = parse_type(node.text)
+    except ArrayArityError as exc:
+        # A wrong Array arity gets its own code, distinct from a generally
+        # malformed expression (spec 2.5). Checked before TypeParseError since it
+        # is a subclass.
+        diags.add(errors.ARRAY_ARITY, str(exc), path, at=node)
+        return
     except TypeParseError as exc:
         diags.add(errors.MALFORMED_TYPE_EXPR, str(exc), path, at=node)
         return

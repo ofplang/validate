@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: array_arity
+    path: "processes.main.inputs.xs.type"
+notes: "Array<> has zero type arguments; arity is exactly one (spec 2.5)."
