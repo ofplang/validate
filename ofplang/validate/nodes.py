@@ -278,20 +278,54 @@ def _check_branch(
             at=node,
         )
 
-    # When `outputs` is present, modes must be valid for branch, and `mode: drop`
-    # may be used only for Data outputs -- an Object-bearing output must be
-    # exposed as common, never dropped (spec 20.1 rules 6-7).
+    # Object outputs common to both arms (identity equivalence is checked
+    # separately below; here we govern how they are exposed and typed).
+    common_obj = then_obj & else_obj
+
+    # When `outputs` is present, modes must be valid for branch, and every Object
+    # output common to both arms must be exposed with `mode: common` -- it may
+    # never be dropped or omitted (spec 20.1 rules 6-7).
     outputs = node.get("outputs")
     if isinstance(outputs, YMap):
         _check_output_modes(diags, outputs, _BRANCH_MODES, nid, base)
-        arm_obj = then_obj | else_obj
-        for oname in outputs.keys():
-            if oname in arm_obj and _mode_of(outputs.get(oname)) == "drop":
+        for oname in sorted(common_obj):
+            if _mode_of(outputs.get(oname)) != "common":
                 diags.add(
                     errors.OBJECT_OUTPUT_BAD_MODE,
-                    f"Object output {oname!r} cannot use drop",
+                    f"Object output {oname!r} must be exposed with mode: common",
                     f"{base}.nodes.{nid}.{oname}",
-                    at=outputs.get(oname),
+                    at=outputs.get(oname) or node,
+                )
+
+    # A common output must have the same type and phase in both arms (spec 20.1
+    # rule 4). Compare the two arm signatures for the names exposed as common:
+    # the explicitly listed `common` outputs, or -- with `outputs` omitted -- the
+    # default Object-bearing commons (spec 20.3). Needs both arms to be real
+    # processes; an implicit identity else preserves types by construction.
+    else_sig = None
+    if isinstance(else_arm, YMap):
+        else_ref = else_arm.get("process")
+        if isinstance(else_ref, YScalar):
+            else_sig = sigs.get(else_ref.text)
+    then_sig = sigs.get(then_proc.text) if isinstance(then_proc, YScalar) else None
+    if then_sig is not None and else_sig is not None:
+        if isinstance(outputs, YMap):
+            common_names = {o for o in outputs.keys() if _mode_of(outputs.get(o)) == "common"}
+        else:
+            common_names = set(common_obj)
+        for name in sorted(common_names):
+            ts = then_sig.outputs.get(name)
+            es = else_sig.outputs.get(name)
+            if ts is None or es is None:
+                continue  # missing from an arm: reported as one-sided / not-common
+            if ts.type_expr is None or es.type_expr is None:
+                continue  # a malformed type is already reported by the type pass
+            if ts.type_expr != es.type_expr or ts.phase != es.phase:
+                diags.add(
+                    errors.BRANCH_COMMON_TYPE_MISMATCH,
+                    f"common output {name!r} has a different type or phase across arms",
+                    f"{base}.nodes.{nid}.{name}",
+                    at=node,
                 )
 
     # Identity-equivalence for outputs common to both arms (spec 20.2): each arm

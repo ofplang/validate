@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: branch_common_type_mismatch
+    path: "main.body.nodes.pick.result"
+notes: "The common output 'result' is Sample in one arm and Widget in the other (spec 20.1 rule 4, 20.3)."

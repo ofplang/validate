@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: object_output_bad_mode
+    path: "main.body.nodes.handle.cup"
+notes: "An Object output common to both arms must be exposed with mode: common; omitting it from an explicit outputs section is invalid (spec 20.1 rule 7)."

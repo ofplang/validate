@@ -1,0 +1,44 @@
+spec_version: "0.0"
+features:
+  - node_branch
+types:
+  Sample: {domain: object}
+  Widget: {domain: object}
+processes:
+  arm_a:
+    kind: atomic
+    inputs:
+      s: {type: Sample, phase: data}
+    outputs:
+      result: {type: Sample, phase: data}
+    objects:
+      map:
+        outputs.result: inputs.s
+  arm_b:
+    kind: atomic
+    inputs:
+      s: {type: Sample, phase: data}
+    outputs:
+      result: {type: Widget, phase: data}
+    objects:
+      map:
+        outputs.result: inputs.s
+  main:
+    kind: composite
+    inputs:
+      s: {type: Sample, phase: data}
+      flag: {type: Bool, phase: data}
+    body:
+      nodes:
+        - id: pick
+          kind: branch
+          condition:
+            from: inputs.flag
+          args:
+            s: {from: inputs.s}
+          then:
+            process: arm_a
+          else:
+            process: arm_b
+      returns: {}
+entry: main
