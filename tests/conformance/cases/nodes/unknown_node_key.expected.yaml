@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.body.nodes[0].bogus_thing"
+notes: "A key defined for no node kind is an unknown key (spec 2.3)."

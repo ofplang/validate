@@ -40,6 +40,67 @@ _COMPOSITE_KEYS = {
     "type_params", "where", "traits", "contracts",
 }
 
+# Every binding / output-control section name a node may legally carry, across
+# all kinds. A key outside this set on a node is an unknown key; a key inside it
+# but not allowed for the node's kind is a section-not-valid-for-kind error
+# (spec 2.3, 11, 21).
+_NODE_SECTION_KEYS = {
+    "id", "kind", "process", "state", "bind", "each", "carry",
+    "condition", "max_iterations", "args", "then", "else", "outputs",
+}
+
+# Allowed sections per node kind. An ordinary (unkinded) node uses `state` for
+# Object-bearing linear inputs and `bind` for Pure Data inputs (spec 11); it has
+# no output-control section. Structured nodes add their control sections and the
+# `outputs` shaping section (spec 21). `bind` (Pure Data, unrestricted, spec 11)
+# is allowed wherever a target process is invoked with per-port inputs.
+_NODE_ALLOWED = {
+    "ordinary": {"id", "process", "state", "bind"},
+    "map": {"id", "kind", "process", "each", "bind", "outputs"},
+    "fold": {"id", "kind", "process", "each", "carry", "bind", "outputs"},
+    "do_while": {"id", "kind", "process", "carry", "bind", "condition", "max_iterations", "outputs"},
+    "branch": {"id", "kind", "condition", "args", "then", "else", "outputs"},
+}
+
+
+def _check_node_sections(diags: Diagnostics, item: YMap, npath: str, mode: str) -> None:
+    """Enforce the closed section set for a body node's kind (spec 2.3, 11, 21).
+
+    A section defined for some node kind but not this one is reported with the
+    dedicated `section_not_valid_for_kind` code; a key defined for no node kind
+    is an ordinary unknown key. An unrecognized `kind` value defers section
+    placement (allow the union) so we do not spuriously flag on top of the
+    separate unknown-kind concern.
+    """
+    kind_node = item.get("kind")
+    nk = kind_node.text if isinstance(kind_node, YScalar) else None
+    if nk is None:
+        allowed = _NODE_ALLOWED["ordinary"]
+    elif nk in _NODE_ALLOWED:
+        allowed = _NODE_ALLOWED[nk]
+    else:
+        allowed = set().union(*_NODE_ALLOWED.values())
+
+    for key in item.keys():
+        key_node = item.key_node(key)
+        ext = _classify_extension_key(key, mode)
+        if ext is not None:
+            diags.add(ext, f"disallowed key {key!r}", f"{npath}.{key}", at=key_node)
+            continue
+        if key.startswith("$") or key.startswith("x-"):
+            continue
+        if key in allowed:
+            continue
+        if key in _NODE_SECTION_KEYS:
+            diags.add(
+                errors.SECTION_NOT_VALID_FOR_KIND,
+                f"section {key!r} is not valid for node kind {nk or 'ordinary'!r}",
+                f"{npath}.{key}",
+                at=key_node,
+            )
+        else:
+            diags.add(errors.UNKNOWN_KEY, f"unknown key {key!r}", f"{npath}.{key}", at=key_node)
+
 
 def _classify_extension_key(key: str, mode: str) -> str | None:
     """Decide how a non-standard key is treated, independent of position.
@@ -175,6 +236,8 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode, mode: str) -> No
                     if not isinstance(item, YMap):
                         diags.add(errors.WRONG_VALUE_KIND, "node must be a mapping", npath, at=item)
                         continue
+                    # Closed section set for the node's kind (spec 2.3, 11, 21).
+                    _check_node_sections(diags, item, npath, mode)
                     if item.get("id") is None:
                         diags.add(errors.MISSING_REQUIRED_KEY, "node requires 'id'", f"{npath}.id", at=item)
                     # Most node kinds target a single `process`; `branch` is the

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: section_not_valid_for_kind
+    path: "processes.main.body.nodes[0].outputs"
+notes: "An ordinary node has no output-control section; outputs is valid only on structured nodes (spec 21, 11)."
