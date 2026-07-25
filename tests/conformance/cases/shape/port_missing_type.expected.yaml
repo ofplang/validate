@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+    path: "processes.main.inputs.x.type"
+notes: "Every process port must declare a type (spec 6); there is no default."

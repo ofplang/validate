@@ -60,8 +60,19 @@ def _check_ports(
         return
     for pname in ports.keys():
         port = ports.get(pname)
-        if isinstance(port, YMap):
-            _check_type_field(diags, port.get("type"), env, tp, f"{base}.{pname}.type")
+        if not isinstance(port, YMap):
+            # A port declaration must be a mapping; a non-mapping port shape is
+            # reported by the shape pass, so avoid a second, less specific error.
+            continue
+        # Every process port declares both a `type` and a `phase` (spec 6); there
+        # is no default for either. A missing one is a required-key shape error,
+        # reported here (rather than silently resolving to a None-phase / untyped
+        # port that would weaken later phase-flow and Object checks).
+        if port.get("type") is None:
+            diags.add(errors.MISSING_REQUIRED_KEY, "port requires 'type'", f"{base}.{pname}.type", at=port)
+        if port.get("phase") is None:
+            diags.add(errors.MISSING_REQUIRED_KEY, "port requires 'phase'", f"{base}.{pname}.phase", at=port)
+        _check_type_field(diags, port.get("type"), env, tp, f"{base}.{pname}.type")
 
 
 def check_types(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
