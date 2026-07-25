@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: duplicate_key
+    path: "<root>.processes.main"
+notes: "A repeated mapping key in the source document is a validation error (spec 2.3); a non-port duplicate is reported non-fatally as duplicate_key."

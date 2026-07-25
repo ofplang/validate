@@ -14,6 +14,7 @@ from __future__ import annotations
 
 # --- Document shape / YAML strictness (spec 2.3, 2.4) ---------------------
 UNKNOWN_KEY = "unknown_key"
+DUPLICATE_KEY = "duplicate_key"
 NULL_VALUE = "null_value"
 RESERVED_DOLLAR_KEY = "reserved_dollar_key"
 MISSING_REQUIRED_KEY = "missing_required_key"

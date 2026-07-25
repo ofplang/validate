@@ -93,6 +93,7 @@ def validate(
     from ofplang.validate.yamlnode import YamlError, YMap
     from ofplang.validate.imports import load_expanded
     from ofplang.validate import shape as shape_pass
+    from ofplang.validate import duplicates as duplicates_pass
     from ofplang.validate import identifiers as identifiers_pass
     from ofplang.validate import entry as entry_pass
     from ofplang.validate import typecheck as typecheck_pass
@@ -128,6 +129,11 @@ def validate(
 
     # Step 2: structural shape, reserved-key, and metadata-format checks.
     shape_pass.check_shape(root, diags, mode)
+
+    # Duplicate mapping keys (spec 2.3, 2.4): non-fatal, so they no longer
+    # suppress other findings. Import-merge duplicates were already caught
+    # fatally during expansion (spec 3.2).
+    duplicates_pass.check_duplicates(root, diags)
 
     # Identifier grammar / reserved-name checks on declaration sites.
     identifiers_pass.check_identifiers(root, diags) if _is_map(root) else None

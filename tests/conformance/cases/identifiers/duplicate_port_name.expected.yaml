@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: duplicate_port_name
+    path: "processes.main.inputs.x"
+notes: "Duplicate names within inputs are validation errors (spec 2.4). Reported non-fatally, not as duplicate_key_after_import."

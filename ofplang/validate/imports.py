@@ -108,11 +108,12 @@ def _expand(node: YNode, current_file: Path, stack: list[Path]) -> YNode:
     """Recursively expand `$import` occurrences within ``node``."""
     if isinstance(node, YMap):
         # Mapping position: a `$import` key is replaced by the entries of each
-        # imported mapping, merged at this level (spec 3.2). Duplicate keys that
-        # result are detected afterward by the whole-tree scan.
+        # imported mapping, merged at this level (spec 3.2).
         new_entries: list[tuple[YScalar, YNode]] = []
+        had_import = False
         for key, value in node.entries:
             if key.text == "$import":
+                had_import = True
                 for imported in _load_targets(value, current_file, stack):
                     if not isinstance(imported, YMap):
                         raise YamlError(
@@ -123,7 +124,22 @@ def _expand(node: YNode, current_file: Path, stack: list[Path]) -> YNode:
                     new_entries.extend(imported.entries)
             else:
                 new_entries.append((key, _expand(value, current_file, stack)))
-        return YMap(tag=node.tag, pos=node.pos, entries=new_entries)
+        merged = YMap(tag=node.tag, pos=node.pos, entries=new_entries)
+        # A duplicate produced *by* an import merge is a fatal structural import
+        # error (spec 3.2): the merged document is unusable. Only maps that
+        # actually merged an import are checked here; plain source-document
+        # duplicates (no `$import` at this level) are non-fatal and reported by
+        # the `duplicates` pass with `duplicate_key` / `duplicate_port_name`.
+        if had_import:
+            dups = merged.duplicate_keys()
+            if dups:
+                key_node = merged.key_node(dups[0])
+                raise YamlError(
+                    errors.DUPLICATE_KEY_AFTER_IMPORT,
+                    f"duplicate key {dups[0]!r} after import resolution",
+                    key_node.pos if key_node else merged.pos,
+                )
+        return merged
 
     if isinstance(node, YSeq):
         # Sequence position: an item that is solely a `$import` mapping is a
@@ -148,41 +164,18 @@ def _expand(node: YNode, current_file: Path, stack: list[Path]) -> YNode:
     return node
 
 
-def _scan_duplicate_keys(node: YNode) -> None:
-    """After expansion, reject any mapping with duplicate keys (spec 3.2).
-
-    Duplicate keys are only well-defined once imports are merged, so this runs
-    on the expanded tree. The first collision raises, matching the single-cause
-    reporting of import errors.
-    """
-    if isinstance(node, YMap):
-        dups = node.duplicate_keys()
-        if dups:
-            # Point at the duplicated key node itself, not the enclosing map.
-            key_node = node.key_node(dups[0])
-            raise YamlError(
-                errors.DUPLICATE_KEY_AFTER_IMPORT,
-                f"duplicate key {dups[0]!r} after import resolution",
-                key_node.pos if key_node else node.pos,
-            )
-        for _, value in node.entries:
-            _scan_duplicate_keys(value)
-    elif isinstance(node, YSeq):
-        for item in node.items:
-            _scan_duplicate_keys(item)
-
-
 def load_expanded(source: str | Path) -> YNode:
     """Load the root document and return its fully import-expanded tree.
 
     This is the single entry point the validator uses in place of a bare load:
-    it performs load -> recursive expand -> duplicate-key scan, raising
-    :class:`YamlError` for any structural import failure.
+    it performs load -> recursive expand, raising :class:`YamlError` for any
+    structural import failure (including a duplicate produced by an import merge,
+    detected at the merging map position in ``_expand``). Plain source-document
+    duplicate keys are not fatal; they are reported non-fatally by the
+    ``duplicates`` pass on the expanded tree.
     """
     # Resolve for cycle identity, but load via the path as given so the root's
     # diagnostics display the same (often relative) path the caller passed.
     root_path = Path(source).resolve()
     root = load_document(source)
-    expanded = _expand(root, root_path, [root_path])
-    _scan_duplicate_keys(expanded)
-    return expanded
+    return _expand(root, root_path, [root_path])
