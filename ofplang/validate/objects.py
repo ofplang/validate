@@ -34,7 +34,7 @@ from ofplang.validate.types import (
     parse_type,
     process_type_params,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 
 # --- Per-process signature -------------------------------------------------
@@ -188,7 +188,12 @@ def _validate_transform_entry(
 
     # 1. Kind must be a defined v0 transform.
     if kind not in _TRANSFORM_ROLES:
-        diags.add(errors.UNKNOWN_TRANSFORM_KIND, f"unknown transform kind {kind!r}", f"{base}.kind", at=entry)
+        diags.add(
+            errors.UNKNOWN_TRANSFORM_KIND,
+            f"unknown transform kind {kind!r}",
+            f"{base}.kind",
+            at=entry,
+        )
         return
 
     exp_in, exp_out = _TRANSFORM_ROLES[kind]
@@ -207,7 +212,9 @@ def _validate_transform_entry(
         for role, val in role_map.items():
             if isinstance(val, YScalar):
                 parsed = _parse_path(val.text)
-                if parsed is None or parsed[1] not in (sig.inputs if parsed[0] == "inputs" else sig.outputs):
+                if parsed is None or parsed[1] not in (
+                    sig.inputs if parsed[0] == "inputs" else sig.outputs
+                ):
                     diags.add(
                         errors.OBJECTS_PATH_NOT_FOUND,
                         f"objects path {val.text!r} does not name a declared port",
@@ -249,7 +256,12 @@ def _validate_transform_entry(
             if t is not None:
                 ts.append(t)
     if role_mismatch or any(t != ts[0] for t in ts[1:]):
-        diags.add(errors.TRANSFORM_ROLE_TYPE_MISMATCH, f"inconsistent element type in {kind}", base, at=entry)
+        diags.add(
+            errors.TRANSFORM_ROLE_TYPE_MISMATCH,
+            f"inconsistent element type in {kind}",
+            base,
+            at=entry,
+        )
 
 
 # --- Atomic Object completeness --------------------------------------------
@@ -288,16 +300,26 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                     obj_outputs.discard(name)
         # Whatever remains is unaccounted.
         for name in sorted(obj_inputs):
-            diags.add(errors.INCOMPLETE_OBJECTS, f"input {name!r} has no fate", f"{base}.inputs.{name}", at=_in_at(name))
+            diags.add(
+                errors.INCOMPLETE_OBJECTS,
+                f"input {name!r} has no fate",
+                f"{base}.inputs.{name}",
+                at=_in_at(name),
+            )
         for name in sorted(obj_outputs):
-            diags.add(errors.INCOMPLETE_OBJECTS, f"output {name!r} has no provenance", f"{base}.outputs.{name}", at=_out_at(name))
+            diags.add(
+                errors.INCOMPLETE_OBJECTS,
+                f"output {name!r} has no provenance",
+                f"{base}.outputs.{name}",
+                at=_out_at(name),
+            )
         return
 
     # Count fates (per Object input) and provenances (per Object output) across
     # the four declaration mechanisms. Counting (rather than boolean) lets us
     # distinguish "none" (incomplete) from "more than one" (conflicting).
-    fates: dict[str, int] = {n: 0 for n in obj_inputs}
-    provs: dict[str, int] = {n: 0 for n in obj_outputs}
+    fates: dict[str, int] = dict.fromkeys(obj_inputs, 0)
+    provs: dict[str, int] = dict.fromkeys(obj_outputs, 0)
 
     def _exists(parsed: tuple[str, str] | None) -> bool:
         """Whether a parsed path names a declared port on the side it names.
@@ -315,7 +337,12 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
         return port in ports
 
     def _not_found(text: str, path: str, at) -> None:
-        diags.add(errors.OBJECTS_PATH_NOT_FOUND, f"objects path {text!r} does not name a declared port", path, at=at)
+        diags.add(
+            errors.OBJECTS_PATH_NOT_FOUND,
+            f"objects path {text!r} does not name a declared port",
+            path,
+            at=at,
+        )
 
     if isinstance(objects, YMap):
         # map: outputs.X (provenance) <- inputs.Y (fate). Cross-wiring allowed.
@@ -325,14 +352,18 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                 src = map_node.get(out_path)
                 op = _parse_path(out_path)
                 if not _exists(op):
-                    _not_found(out_path, f"{base}.objects.map.{out_path}", map_node.key_node(out_path))
-                elif op[0] == "outputs" and op[1] in provs:
+                    _not_found(
+                        out_path,
+                        f"{base}.objects.map.{out_path}",
+                        map_node.key_node(out_path),
+                    )
+                elif op is not None and op[0] == "outputs" and op[1] in provs:
                     provs[op[1]] += 1
                 if isinstance(src, YScalar):
                     ip = _parse_path(src.text)
                     if not _exists(ip):
                         _not_found(src.text, f"{base}.objects.map.{out_path}", src)
-                    elif ip[0] == "inputs" and ip[1] in fates:
+                    elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
 
         # consume: input Object identities terminated here.
@@ -343,7 +374,7 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                     ip = _parse_path(item.text)
                     if not _exists(ip):
                         _not_found(item.text, f"{base}.objects.consume", item)
-                    elif ip[0] == "inputs" and ip[1] in fates:
+                    elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
 
         # create: new output Object identities.
@@ -354,7 +385,7 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                     op = _parse_path(item.text)
                     if not _exists(op):
                         _not_found(item.text, f"{base}.objects.create", item)
-                    elif op[0] == "outputs" and op[1] in provs:
+                    elif op is not None and op[0] == "outputs" and op[1] in provs:
                         provs[op[1]] += 1
 
         # transform: validated in detail, and its Object ports counted once.
@@ -378,14 +409,34 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
     # here as a fate count of 2 -> multiple_fates (spec 13.1 example).
     for name in sorted(fates):
         if fates[name] == 0:
-            diags.add(errors.INCOMPLETE_OBJECTS, f"input {name!r} has no fate", f"{base}.inputs.{name}", at=_in_at(name))
+            diags.add(
+                errors.INCOMPLETE_OBJECTS,
+                f"input {name!r} has no fate",
+                f"{base}.inputs.{name}",
+                at=_in_at(name),
+            )
         elif fates[name] > 1:
-            diags.add(errors.MULTIPLE_FATES, f"input {name!r} has multiple fates", f"{base}.inputs.{name}", at=_in_at(name))
+            diags.add(
+                errors.MULTIPLE_FATES,
+                f"input {name!r} has multiple fates",
+                f"{base}.inputs.{name}",
+                at=_in_at(name),
+            )
     for name in sorted(provs):
         if provs[name] == 0:
-            diags.add(errors.INCOMPLETE_OBJECTS, f"output {name!r} has no provenance", f"{base}.outputs.{name}", at=_out_at(name))
+            diags.add(
+                errors.INCOMPLETE_OBJECTS,
+                f"output {name!r} has no provenance",
+                f"{base}.outputs.{name}",
+                at=_out_at(name),
+            )
         elif provs[name] > 1:
-            diags.add(errors.MULTIPLE_PROVENANCES, f"output {name!r} has multiple provenances", f"{base}.outputs.{name}", at=_out_at(name))
+            diags.add(
+                errors.MULTIPLE_PROVENANCES,
+                f"output {name!r} has multiple provenances",
+                f"{base}.outputs.{name}",
+                at=_out_at(name),
+            )
 
 
 # --- Composite linearity ---------------------------------------------------
@@ -491,7 +542,7 @@ def _check_composite(
     # Count outdegree of each Object source. Linearity requires exactly one use
     # (spec 12.2): zero is an unused Object output, more than one is fan-out.
     refs = _collect_refs(body)
-    counts: dict[tuple[str, str], int] = {src: 0 for src in sources}
+    counts: dict[tuple[str, str], int] = dict.fromkeys(sources, 0)
     for tgt in refs:
         if tgt in counts:
             counts[tgt] += 1

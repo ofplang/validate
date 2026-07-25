@@ -19,7 +19,7 @@ from ofplang.validate.types import (
     parse_type,
     process_type_params,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar
 
 _PHASES = {"graph", "run", "data"}
 
@@ -46,7 +46,12 @@ def _check_ports(
         # An unrecognized phase word is a shape mistake; report it but keep going
         # so we can still evaluate the Object-bearing rule where applicable.
         if phase is not None and phase not in _PHASES:
-            diags.add(errors.WRONG_VALUE_KIND, f"unknown phase {phase!r}", f"{ppath}.phase", at=phase_node)
+            diags.add(
+                errors.WRONG_VALUE_KIND,
+                f"unknown phase {phase!r}",
+                f"{ppath}.phase",
+                at=phase_node,
+            )
 
         # Object-bearing + graph phase is the prohibited combination. We must
         # resolve the port type to know whether it is Object-bearing; malformed

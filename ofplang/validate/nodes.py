@@ -22,8 +22,7 @@ from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.objects import ProcSig
 from ofplang.validate.types import Atom
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
-
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Valid output-control modes per structured node kind (spec 18.1, 19.1, 20.1).
 _FOLD_MODES = {"carry", "collect", "last", "drop"}
@@ -167,7 +166,12 @@ def _check_zip(diags: Diagnostics, node: YMap, nid: str, base: str) -> None:
     """
     lengths, _ = _each_literal_lengths(node)
     if len(set(lengths)) > 1:
-        diags.add(errors.ZIP_MISMATCH, "each sources have unequal literal lengths", f"{base}.nodes.{nid}", at=node)
+        diags.add(
+            errors.ZIP_MISMATCH,
+            "each sources have unequal literal lengths",
+            f"{base}.nodes.{nid}",
+            at=node,
+        )
 
 
 def _check_fold_outputs(
@@ -209,9 +213,15 @@ def _check_fold_outputs(
     # Empty-traversal + mode:last is invalid when emptiness is graph-known (18.2).
     lengths, all_literal = _each_literal_lengths(node)
     empty_known = all_literal and lengths and all(x == 0 for x in lengths)
-    if empty_known and isinstance(outputs, YMap):
-        if any(_mode_of(outputs.get(o)) == "last" for o in outputs.keys()):
-            diags.add(errors.LAST_ON_EMPTY_FOLD, "mode: last on a graph-empty traversal", f"{base}.nodes.{nid}", at=node)
+    if empty_known and isinstance(outputs, YMap) and any(
+        _mode_of(outputs.get(o)) == "last" for o in outputs.keys()
+    ):
+        diags.add(
+            errors.LAST_ON_EMPTY_FOLD,
+            "mode: last on a graph-empty traversal",
+            f"{base}.nodes.{nid}",
+            at=node,
+        )
 
 
 def _check_do_while_outputs(
@@ -247,7 +257,11 @@ def _check_do_while_outputs(
         if isinstance(out_node, YScalar):
             cname = out_node.text
             osig = target.outputs.get(cname)
-            is_bool = osig is not None and isinstance(osig.type_expr, Atom) and osig.type_expr.name == "Bool"
+            is_bool = (
+                osig is not None
+                and isinstance(osig.type_expr, Atom)
+                and osig.type_expr.name == "Bool"
+            )
             if not is_bool:
                 diags.add(
                     errors.BAD_CONDITION_OUTPUT,
@@ -359,16 +373,16 @@ def _check_branch(
     # different argument, makes the resulting identity arm-dependent.
     then_def = processes.get(then_proc.text) if isinstance(then_proc, YScalar) else None
     else_def = (
-        processes.get(else_arm.get("process").text)
-        if isinstance(else_arm, YMap) and isinstance(else_arm.get("process"), YScalar)
+        processes.get(else_proc.text)
+        if isinstance(else_arm, YMap) and isinstance(else_proc := else_arm.get("process"), YScalar)
         else None
     )
     if isinstance(then_def, YMap) and isinstance(else_def, YMap):
         then_src = _map_sources(then_def)
         else_src = _map_sources(else_def)
         for name in sorted(then_obj & else_obj):
-            ts, es = then_src.get(name), else_src.get(name)
-            if ts is None or es is None or ts != es:
+            t_src, e_src = then_src.get(name), else_src.get(name)
+            if t_src is None or e_src is None or t_src != e_src:
                 diags.add(
                     errors.BRANCH_NOT_IDENTITY_EQUIVALENT,
                     f"common Object output {name!r} is not identity-equivalent across arms",
@@ -386,7 +400,8 @@ def _check_branch(
             if then_src.get(name) != name:
                 diags.add(
                     errors.BRANCH_NOT_IDENTITY_EQUIVALENT,
-                    f"common Object output {name!r} is not identity-equivalent to the implicit else",
+                    f"common Object output {name!r} is not identity-equivalent "
+                    "to the implicit else",
                     f"{base}.nodes.{nid}.{name}",
                     at=node,
                 )

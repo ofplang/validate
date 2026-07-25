@@ -24,7 +24,7 @@ from __future__ import annotations
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.objects import ProcSig
-from ofplang.validate.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
 # Phase order graph < run < data (spec 6). Rank lets us compare "earlier".
 _PHASE_RANK = {"graph": 0, "run": 1, "data": 2}
@@ -113,18 +113,20 @@ def _check_composite(
     base = f"processes.{pname}.body"
 
     nodes = body.get("nodes")
-    node_items = [n for n in (nodes.items if hasattr(nodes, "items") else []) if isinstance(n, YMap)]
+    node_items = [
+        n for n in (nodes.items if isinstance(nodes, YSeq) else []) if isinstance(n, YMap)
+    ]
 
     # Build the set of resolvable body sources and an id->node index.
     input_names = set(sig.inputs)
     node_out: set[tuple[str, str]] = set()
     nodes_by_id: dict[str, YMap] = {}
     for node in node_items:
-        nid = node.get("id")
-        if isinstance(nid, YScalar):
-            nodes_by_id[nid.text] = node
+        id_node = node.get("id")
+        if isinstance(id_node, YScalar):
+            nodes_by_id[id_node.text] = node
             for oname in _node_output_names(node, sigs):
-                node_out.add((nid.text, oname))
+                node_out.add((id_node.text, oname))
 
     def _resolves(ref: tuple[str, str]) -> bool:
         owner, name = ref
@@ -138,7 +140,12 @@ def _check_composite(
         has_value = entry.get("value") is not None
         # Exactly one of from/value (spec 2.6.6).
         if has_from == has_value:  # both present, or both absent
-            diags.add(errors.BINDING_SOURCE_ARITY, "source needs exactly one of from/value", path, at=entry)
+            diags.add(
+                errors.BINDING_SOURCE_ARITY,
+                "source needs exactly one of from/value",
+                path,
+                at=entry,
+            )
             return
         if not has_from:
             return  # a literal `value`: no reference to resolve
@@ -155,13 +162,16 @@ def _check_composite(
         # Phase-flow: source phase must be earlier-or-equal to the target port.
         if target_input_phase is not None:
             src_phase = _source_phase(ref, sig, nodes_by_id, sigs)
-            if src_phase in _PHASE_RANK and target_input_phase in _PHASE_RANK:
-                if _PHASE_RANK[src_phase] > _PHASE_RANK[target_input_phase]:
-                    diags.add(
-                        errors.INVALID_PHASE_FLOW,
-                        f"{src_phase} value flows into a {target_input_phase} port",
-                        path,
-                    )
+            if (
+                src_phase in _PHASE_RANK
+                and target_input_phase in _PHASE_RANK
+                and _PHASE_RANK[src_phase] > _PHASE_RANK[target_input_phase]
+            ):
+                diags.add(
+                    errors.INVALID_PHASE_FLOW,
+                    f"{src_phase} value flows into a {target_input_phase} port",
+                    path,
+                )
 
     for node in node_items:
         nid_node = node.get("id")
@@ -196,8 +206,17 @@ def _check_composite(
                     frm = entry.get("from")
                     if isinstance(frm, YScalar):
                         ref = _parse_ref(frm.text)
-                        if ref and _resolves(ref) and _source_object_bearing(ref, sig, nodes_by_id, sigs):
-                            diags.add(errors.OBJECT_VIA_BIND, "Object-bearing value passed through bind", epath, at=frm)
+                        if (
+                            ref
+                            and _resolves(ref)
+                            and _source_object_bearing(ref, sig, nodes_by_id, sigs)
+                        ):
+                            diags.add(
+                                errors.OBJECT_VIA_BIND,
+                                "Object-bearing value passed through bind",
+                                epath,
+                                at=frm,
+                            )
 
         # A branch condition is itself a body dataflow reference.
         if kind == "branch":
@@ -207,9 +226,19 @@ def _check_composite(
                 if isinstance(frm, YScalar):
                     ref = _parse_ref(frm.text)
                     if ref is None:
-                        diags.add(errors.MALFORMED_REFERENCE, "malformed condition reference", f"{base}.nodes.{nid}.condition", at=frm)
+                        diags.add(
+                            errors.MALFORMED_REFERENCE,
+                            "malformed condition reference",
+                            f"{base}.nodes.{nid}.condition",
+                            at=frm,
+                        )
                     elif not _resolves(ref):
-                        diags.add(errors.UNKNOWN_REFERENCE, f"unresolved condition {frm.text!r}", f"{base}.nodes.{nid}.condition", at=frm)
+                        diags.add(
+                            errors.UNKNOWN_REFERENCE,
+                            f"unresolved condition {frm.text!r}",
+                            f"{base}.nodes.{nid}.condition",
+                            at=frm,
+                        )
 
         # Node input indegree, ordinary nodes only: every target input port must
         # be bound exactly once via state (Object) or bind (Pure Data).
@@ -221,11 +250,29 @@ def _check_composite(
                     if isinstance(m, YMap) and iname in m.keys():
                         count += 1
                 if count == 0:
-                    code = errors.OBJECT_INPUT_NO_SOURCE if isig.object_bearing else errors.DATA_INDEGREE
-                    diags.add(code, f"input {iname!r} has no source", f"{base}.nodes.{nid}.{iname}", at=node)
+                    code = (
+                        errors.OBJECT_INPUT_NO_SOURCE
+                        if isig.object_bearing
+                        else errors.DATA_INDEGREE
+                    )
+                    diags.add(
+                        code,
+                        f"input {iname!r} has no source",
+                        f"{base}.nodes.{nid}.{iname}",
+                        at=node,
+                    )
                 elif count > 1:
-                    code = errors.OBJECT_INPUT_MULTI_SOURCE if isig.object_bearing else errors.DATA_INDEGREE
-                    diags.add(code, f"input {iname!r} has multiple sources", f"{base}.nodes.{nid}.{iname}", at=node)
+                    code = (
+                        errors.OBJECT_INPUT_MULTI_SOURCE
+                        if isig.object_bearing
+                        else errors.DATA_INDEGREE
+                    )
+                    diags.add(
+                        code,
+                        f"input {iname!r} has multiple sources",
+                        f"{base}.nodes.{nid}.{iname}",
+                        at=node,
+                    )
 
     # returns entries are body dataflow references too.
     returns = body.get("returns")
@@ -237,9 +284,19 @@ def _check_composite(
                 if isinstance(frm, YScalar):
                     ref = _parse_ref(frm.text)
                     if ref is None:
-                        diags.add(errors.MALFORMED_REFERENCE, "malformed return reference", f"{base}.returns.{rname}", at=frm)
+                        diags.add(
+                            errors.MALFORMED_REFERENCE,
+                            "malformed return reference",
+                            f"{base}.returns.{rname}",
+                            at=frm,
+                        )
                     elif not _resolves(ref):
-                        diags.add(errors.UNKNOWN_REFERENCE, f"unresolved return {frm.text!r}", f"{base}.returns.{rname}", at=frm)
+                        diags.add(
+                            errors.UNKNOWN_REFERENCE,
+                            f"unresolved return {frm.text!r}",
+                            f"{base}.returns.{rname}",
+                            at=frm,
+                        )
 
 
 def check_references(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None:

@@ -18,11 +18,11 @@ from pathlib import Path
 
 from ofplang.validate import errors
 from ofplang.validate.yamlnode import (
+    YamlError,
     YMap,
+    YNode,
     YScalar,
     YSeq,
-    YNode,
-    YamlError,
     load_document,
 )
 
@@ -46,7 +46,9 @@ def _import_targets(value: YNode) -> list[str]:
         paths: list[str] = []
         for item in value.items:
             if not isinstance(item, YScalar) or not item.is_str:
-                raise YamlError(errors.NON_STRING_IMPORT_PATH, "import path must be a string", item.pos)
+                raise YamlError(
+                    errors.NON_STRING_IMPORT_PATH, "import path must be a string", item.pos
+                )
             if item.text == "":
                 raise YamlError(errors.EMPTY_IMPORT, "empty import path", item.pos)
             paths.append(item.text)
@@ -55,7 +57,9 @@ def _import_targets(value: YNode) -> list[str]:
     # Scalar form: a single path.
     if isinstance(value, YScalar):
         if value.is_null or not value.is_str:
-            raise YamlError(errors.NON_STRING_IMPORT_PATH, "import path must be a string", value.pos)
+            raise YamlError(
+                errors.NON_STRING_IMPORT_PATH, "import path must be a string", value.pos
+            )
         if value.text == "":
             raise YamlError(errors.EMPTY_IMPORT, "empty import path", value.pos)
         return [value.text]

@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 from ofplang.validate import validate
-from ofplang.validate.validator import STRICT, EXTENSION_TOLERANT, ValidationResult
+from ofplang.validate.validator import EXTENSION_TOLERANT, STRICT, ValidationResult
 
 # Exit codes are part of the CLI contract (scripts/CI depend on them).
 EXIT_OK = 0
@@ -59,7 +59,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="output format (default: text)",
     )
     parser.add_argument(
-        "-q", "--quiet", action="store_true", help="suppress per-diagnostic lines; show only the summary"
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="suppress per-diagnostic lines; show only the summary",
     )
     parser.add_argument("--no-color", action="store_true", help="disable ANSI color output")
     return parser
@@ -83,11 +86,10 @@ def _render_text(results: list[tuple[str, ValidationResult]], quiet: bool, color
 
     for path, result in results:
         if result.ok:
-            if not quiet:
-                # Only announce OK files explicitly when validating several, so
-                # single-file runs stay terse.
-                if multi:
-                    lines.append(f"{path}: {c('OK', _GREEN)}")
+            # Only announce OK files explicitly when validating several, so
+            # single-file runs stay terse.
+            if not quiet and multi:
+                lines.append(f"{path}: {c('OK', _GREEN)}")
             continue
         invalid_files += 1
         total_errors += len(result.diagnostics)
@@ -109,7 +111,9 @@ def _render_text(results: list[tuple[str, ValidationResult]], quiet: bool, color
                 lines.append(f"{indent}{locator}: {c('error', _RED)} {d.code}{detail}{msg}")
 
     if total_errors == 0:
-        lines.append(c(f"all valid ({len(results)} file{'s' if len(results) != 1 else ''})", _GREEN))
+        lines.append(
+            c(f"all valid ({len(results)} file{'s' if len(results) != 1 else ''})", _GREEN)
+        )
     else:
         lines.append(
             c(f"{total_errors} error{'s' if total_errors != 1 else ''} in "

@@ -18,23 +18,24 @@ the node layer; it is out of scope here.
 
 from __future__ import annotations
 
+import contextlib
 import re
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.objects import ProcSig
 from ofplang.validate.types import (
-    ArrayT,
-    Atom,
     BUILTIN_TYPE_NAMES,
     PRIMITIVE_TYPES,
+    ArrayT,
+    Atom,
     TypeEnv,
     TypeExpr,
     TypeParseError,
     parse_type,
     process_type_params,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
 # A `where` constraint: TraitName<Param>, whitespace allowed only inside the
 # angle brackets (spec 8.1) — mirrors the type-expression whitespace rule.
@@ -60,10 +61,8 @@ def _input_atoms(proc: YMap) -> set[str]:
             if isinstance(port, YMap):
                 tnode = port.get("type")
                 if isinstance(tnode, YScalar) and tnode.is_str:
-                    try:
+                    with contextlib.suppress(TypeParseError):
                         names |= _atoms(parse_type(tnode.text))
-                    except TypeParseError:
-                        pass
     return names
 
 
@@ -86,7 +85,12 @@ def _implements_map(doc: YMap) -> dict[str, set[str]]:
     return out
 
 
-def _unify(pexpr: TypeExpr, sexpr: TypeExpr | None, params: set[str], bindings: dict[str, TypeExpr]) -> None:
+def _unify(
+    pexpr: TypeExpr,
+    sexpr: TypeExpr | None,
+    params: set[str],
+    bindings: dict[str, TypeExpr],
+) -> None:
     """Infer type-parameter bindings by structural matching (spec 8.1).
 
     Only the shapes v0 inference needs: a parameter atom binds to the concrete
@@ -102,7 +106,9 @@ def _unify(pexpr: TypeExpr, sexpr: TypeExpr | None, params: set[str], bindings: 
         _unify(pexpr.elem, sexpr.elem, params, bindings)
 
 
-def _source_type(ref_text: str, comp_sig: ProcSig, sigs: dict[str, ProcSig], nodes_by_id) -> TypeExpr | None:
+def _source_type(
+    ref_text: str, comp_sig: ProcSig, sigs: dict[str, ProcSig], nodes_by_id
+) -> TypeExpr | None:
     """Resolve a `from` reference to the concrete type of the value it names."""
     parts = ref_text.split(".")
     if len(parts) != 2:
@@ -148,9 +154,9 @@ def _check_instantiations(
             continue
 
         nodes_by_id = {
-            n.get("id").text: n
+            nid.text: n
             for n in nodes.items
-            if isinstance(n, YMap) and isinstance(n.get("id"), YScalar)
+            if isinstance(n, YMap) and isinstance(nid := n.get("id"), YScalar)
         }
 
         for node in nodes.items:
@@ -187,13 +193,15 @@ def _check_instantiations(
             where = target_def.get("where")
             if not isinstance(where, YSeq):
                 continue
+            nid_node = node.get("id")
+            node_id = nid_node.text if isinstance(nid_node, YScalar) else "?"
             for item in where.items:
                 if not isinstance(item, YScalar):
                     continue
-                m = _CONSTRAINT_RE.match(item.text)
-                if not m:
+                cm = _CONSTRAINT_RE.match(item.text)
+                if not cm:
                     continue  # malformed constraint reported at definition
-                trait, param = m.group(1), m.group(2)
+                trait, param = cm.group(1), cm.group(2)
                 concrete = bindings.get(param)
                 if not isinstance(concrete, Atom):
                     continue  # could not infer a concrete atom; skip
@@ -206,7 +214,7 @@ def _check_instantiations(
                     diags.add(
                         errors.CONSTRAINT_NOT_SATISFIED,
                         f"{cname} does not satisfy {trait}<{param}>",
-                        f"processes.{pname}.body.nodes.{node.get('id').text}",
+                        f"processes.{pname}.body.nodes.{node_id}",
                         at=node,
                     )
 
@@ -244,9 +252,19 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
             decl = tp_node.get(name)
             dom = decl.get("domain") if isinstance(decl, YMap) else None
             if not isinstance(dom, YScalar):
-                diags.add(errors.MISSING_TYPE_PARAM_DOMAIN, f"{name!r} needs a domain", f"{base}.type_params.{name}", at=tp_node.key_node(name))
+                diags.add(
+                    errors.MISSING_TYPE_PARAM_DOMAIN,
+                    f"{name!r} needs a domain",
+                    f"{base}.type_params.{name}",
+                    at=tp_node.key_node(name),
+                )
             elif dom.text not in ("data", "object"):
-                diags.add(errors.BAD_TYPE_PARAM_DOMAIN, f"invalid domain {dom.text!r}", f"{base}.type_params.{name}", at=dom)
+                diags.add(
+                    errors.BAD_TYPE_PARAM_DOMAIN,
+                    f"invalid domain {dom.text!r}",
+                    f"{base}.type_params.{name}",
+                    at=dom,
+                )
 
         # Every parameter must appear in an input port type so inference can bind
         # it (spec 8.1). Parameters used only in outputs/where are errors.
@@ -266,21 +284,42 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
             for i, item in enumerate(where.items):
                 cpath = f"{base}.where[{i}]"
                 if not isinstance(item, YScalar) or not item.is_str:
-                    diags.add(errors.MALFORMED_CONSTRAINT, "constraint must be a string", cpath, at=item)
+                    diags.add(
+                        errors.MALFORMED_CONSTRAINT, "constraint must be a string", cpath, at=item
+                    )
                     continue
                 m = _CONSTRAINT_RE.match(item.text)
                 if not m:
-                    diags.add(errors.MALFORMED_CONSTRAINT, f"malformed constraint {item.text!r}", cpath, at=item)
+                    diags.add(
+                        errors.MALFORMED_CONSTRAINT,
+                        f"malformed constraint {item.text!r}",
+                        cpath,
+                        at=item,
+                    )
                     continue
                 trait, param = m.group(1), m.group(2)
                 # The constraint must target a declared parameter of this process.
                 if param not in tp:
                     # Distinguish "constrained a concrete type" (a real, if
                     # disallowed, type name) from arbitrary garbage (spec 8.1).
-                    if param in env.user_types or param in PRIMITIVE_TYPES or param in BUILTIN_TYPE_NAMES:
-                        diags.add(errors.CONSTRAINT_ON_CONCRETE, f"constraint over concrete type {param!r}", cpath, at=item)
+                    if (
+                        param in env.user_types
+                        or param in PRIMITIVE_TYPES
+                        or param in BUILTIN_TYPE_NAMES
+                    ):
+                        diags.add(
+                            errors.CONSTRAINT_ON_CONCRETE,
+                            f"constraint over concrete type {param!r}",
+                            cpath,
+                            at=item,
+                        )
                     else:
-                        diags.add(errors.MALFORMED_CONSTRAINT, f"{param!r} is not a type parameter", cpath, at=item)
+                        diags.add(
+                            errors.MALFORMED_CONSTRAINT,
+                            f"{param!r} is not a type parameter",
+                            cpath,
+                            at=item,
+                        )
                     continue
                 # The trait must be `Numeric` (built-in) or a declared trait.
                 if trait != "Numeric" and trait not in env.traits:

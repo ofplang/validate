@@ -21,7 +21,6 @@ import pytest
 
 from ofplang.validate import validate
 from tests.conformance.cases import (
-    INVALID,
     MATCH_EXACT,
     VALID,
     Case,

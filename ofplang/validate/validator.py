@@ -89,27 +89,27 @@ def validate(
     """
     # Imported lazily so this module has no import-time dependency on PyYAML or
     # the pass modules — keeps the public API cheap to import.
-    from ofplang.validate.diagnostics import Diagnostics
-    from ofplang.validate.yamlnode import YamlError, YMap
-    from ofplang.validate.imports import load_expanded
-    from ofplang.validate import shape as shape_pass
-    from ofplang.validate import duplicates as duplicates_pass
-    from ofplang.validate import identifiers as identifiers_pass
-    from ofplang.validate import entry as entry_pass
-    from ofplang.validate import typecheck as typecheck_pass
-    from ofplang.validate import traits as traits_pass
-    from ofplang.validate import views as views_pass
-    from ofplang.validate import phases as phases_pass
-    from ofplang.validate import features as features_pass
-    from ofplang.validate import objects as objects_pass
-    from ofplang.validate import generics as generics_pass
-    from ofplang.validate import script as script_pass
-    from ofplang.validate import nodes as nodes_pass
     from ofplang.validate import contracts as contracts_pass
-    from ofplang.validate import scheduling as scheduling_pass
+    from ofplang.validate import duplicates as duplicates_pass
+    from ofplang.validate import entry as entry_pass
+    from ofplang.validate import features as features_pass
+    from ofplang.validate import generics as generics_pass
+    from ofplang.validate import identifiers as identifiers_pass
+    from ofplang.validate import nodes as nodes_pass
+    from ofplang.validate import objects as objects_pass
+    from ofplang.validate import phases as phases_pass
     from ofplang.validate import references as references_pass
+    from ofplang.validate import scheduling as scheduling_pass
+    from ofplang.validate import script as script_pass
+    from ofplang.validate import shape as shape_pass
+    from ofplang.validate import traits as traits_pass
+    from ofplang.validate import typecheck as typecheck_pass
+    from ofplang.validate import views as views_pass
+    from ofplang.validate.diagnostics import Diagnostics
+    from ofplang.validate.imports import load_expanded
     from ofplang.validate.objects import build_signatures
     from ofplang.validate.types import build_env
+    from ofplang.validate.yamlnode import YamlError, YMap
 
     if mode not in MODES:
         raise ValueError(f"unknown validation mode: {mode!r}")
@@ -136,7 +136,8 @@ def validate(
     duplicates_pass.check_duplicates(root, diags)
 
     # Identifier grammar / reserved-name checks on declaration sites.
-    identifiers_pass.check_identifiers(root, diags) if _is_map(root) else None
+    if isinstance(root, YMap):
+        identifiers_pass.check_identifiers(root, diags)
 
     # Type layer (spec 2.5, 4, 6, 7). These passes assume a mapping root and a
     # resolved type environment; a bad root was already reported by shape, so we
@@ -163,11 +164,3 @@ def validate(
     entry_pass.check_process_dependencies(root, diags)
 
     return diags.result()
-
-
-def _is_map(node) -> bool:
-    # Small guard so identifier checking (which assumes a mapping root) is only
-    # invoked on a well-formed root; a bad root was already reported by shape.
-    from ofplang.validate.yamlnode import YMap
-
-    return isinstance(node, YMap)

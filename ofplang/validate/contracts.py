@@ -17,21 +17,22 @@ one precise diagnostic per expression:
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.types import (
+    PRIMITIVE_TYPES,
     ArrayT,
     Atom,
-    PRIMITIVE_TYPES,
     TypeEnv,
     TypeExpr,
     TypeParseError,
     parse_type,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 
 class ContractError(Exception):
@@ -103,7 +104,9 @@ def _lex(s: str) -> list[Tok]:
                 # splitting it into an int and junk.
                 end = mi.end()
                 if end < n and s[end] == ".":
-                    raise ContractError(errors.CONTRACT_PARSE_ERROR, f"malformed number near {s[i:]!r}")
+                    raise ContractError(
+                        errors.CONTRACT_PARSE_ERROR, f"malformed number near {s[i:]!r}"
+                    )
                 toks.append(Tok("num_int", mi.group()))
                 i = end
                 continue
@@ -202,7 +205,9 @@ class _Parser:
             # the same level (`a < b < c`) is a specific validation error.
             t2 = self._peek()
             if t2 and t2.kind == "op" and t2.text in _COMPARISONS:
-                raise ContractError(errors.COMPARISON_CHAIN, "comparison operators are non-associative")
+                raise ContractError(
+                    errors.COMPARISON_CHAIN, "comparison operators are non-associative"
+                )
             return Binary(t.text, left, right)
         return left
 
@@ -270,7 +275,9 @@ def _resolve_ref(path: list[str], ctx: ContractCtx) -> str:
     """
     if len(path) < 3 or path[0] not in ("inputs", "outputs") or path[2] != "view":
         # Contracts may only reference explicit `.view` projections (spec 9.2).
-        raise ContractError(errors.CONTRACT_INVALID_REFERENCE, f"invalid reference {'.'.join(path)}")
+        raise ContractError(
+            errors.CONTRACT_INVALID_REFERENCE, f"invalid reference {'.'.join(path)}"
+        )
 
     side, port = path[0], path[1]
     # `requires` may reference only inputs; `ensures` may reference both (9.1).
@@ -439,9 +446,13 @@ def _check_expr(diags: Diagnostics, text: str, ctx: ContractCtx, path: str, at=N
         if not _has_ref(ast):
             try:
                 if _eval(ast) is False:
-                    raise ContractError(errors.CONTRACT_STATIC_FALSE, "contract is statically false")
+                    raise ContractError(
+                        errors.CONTRACT_STATIC_FALSE, "contract is statically false"
+                    )
             except ZeroDivisionError:
-                raise ContractError(errors.CONTRACT_STATIC_FALSE, "static division by zero")
+                raise ContractError(
+                    errors.CONTRACT_STATIC_FALSE, "static division by zero"
+                ) from None
     except ContractError as exc:
         # Position points at the contract expression scalar (the whole line);
         # sub-token offsets within the expression are not tracked in v1.
@@ -467,10 +478,8 @@ def _build_view_schemas(doc: YMap) -> dict[str, dict[str, TypeExpr]]:
                 if isinstance(fdecl, YMap):
                     tnode = fdecl.get("type")
                     if isinstance(tnode, YScalar) and tnode.is_str:
-                        try:
+                        with contextlib.suppress(TypeParseError):
                             fields[fname] = parse_type(tnode.text)
-                        except TypeParseError:
-                            pass
         out[tname] = fields
     return out
 
@@ -484,10 +493,8 @@ def _port_types(ports: YNode | None) -> dict[str, TypeExpr]:
         if isinstance(port, YMap):
             tnode = port.get("type")
             if isinstance(tnode, YScalar) and tnode.is_str:
-                try:
+                with contextlib.suppress(TypeParseError):
                     out[pname] = parse_type(tnode.text)
-                except TypeParseError:
-                    pass
     return out
 
 
@@ -513,7 +520,9 @@ def check_contracts(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
             section = contracts.get(scope)
             if not isinstance(section, YSeq):
                 continue
-            ctx = ContractCtx(inputs=inputs, outputs=outputs, view_schemas=view_schemas, scope=scope)
+            ctx = ContractCtx(
+                inputs=inputs, outputs=outputs, view_schemas=view_schemas, scope=scope
+            )
             for i, item in enumerate(section.items):
                 if not isinstance(item, YMap):
                     continue

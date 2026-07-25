@@ -20,7 +20,7 @@ from ofplang.validate.types import (
     parse_type,
     process_type_params,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar
 
 
 def _has_object_port(ports: YNode | None, env: TypeEnv, tp: dict[str, str]) -> bool:
@@ -56,12 +56,26 @@ def check_scripts(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
         # Only `python` is portable v0 (spec 22).
         lang = script.get("language")
         if isinstance(lang, YScalar) and lang.text != "python":
-            diags.add(errors.UNSUPPORTED_SCRIPT_LANGUAGE, f"unsupported language {lang.text!r}", f"{base}.script.language", at=lang)
+            diags.add(
+                errors.UNSUPPORTED_SCRIPT_LANGUAGE,
+                f"unsupported language {lang.text!r}",
+                f"{base}.script.language",
+                at=lang,
+            )
 
         # All ports must be Pure Data (spec 22.1).
-        if _has_object_port(proc.get("inputs"), env, tp) or _has_object_port(proc.get("outputs"), env, tp):
-            diags.add(errors.SCRIPT_OBJECT_PORT, "script process ports must be Pure Data", base, at=proc)
+        if _has_object_port(proc.get("inputs"), env, tp) or _has_object_port(
+            proc.get("outputs"), env, tp
+        ):
+            diags.add(
+                errors.SCRIPT_OBJECT_PORT, "script process ports must be Pure Data", base, at=proc
+            )
 
         # A script process must not declare Object behavior (spec 22.1).
         if proc.get("objects") is not None:
-            diags.add(errors.SCRIPT_HAS_OBJECTS, "script process must not have an objects section", f"{base}.objects", at=proc.get("objects"))
+            diags.add(
+                errors.SCRIPT_HAS_OBJECTS,
+                "script process must not have an objects section",
+                f"{base}.objects",
+                at=proc.get("objects"),
+            )

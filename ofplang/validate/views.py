@@ -23,7 +23,7 @@ from ofplang.validate.types import (
     parse_type,
     resolve_error,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 
 def _is_primitive_only(expr: TypeExpr) -> bool:
@@ -81,7 +81,12 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
             # parameters in scope (views hang off nominal types, not processes).
             type_node = field.get("type")
             if not isinstance(type_node, YScalar) or not type_node.is_str:
-                diags.add(errors.TYPE_FIELD_NOT_STRING, "view field type must be a string", f"{base}.type", at=type_node or field)
+                diags.add(
+                    errors.TYPE_FIELD_NOT_STRING,
+                    "view field type must be a string",
+                    f"{base}.type",
+                    at=type_node or field,
+                )
                 continue
             try:
                 expr = parse_type(type_node.text)
@@ -89,17 +94,32 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
                 diags.add(errors.MALFORMED_TYPE_EXPR, str(exc), f"{base}.type", at=type_node)
                 continue
             if resolve_error(expr, env, {}) is not None:
-                diags.add(errors.UNKNOWN_TYPE, f"unknown type {type_node.text!r}", f"{base}.type", at=type_node)
+                diags.add(
+                    errors.UNKNOWN_TYPE,
+                    f"unknown type {type_node.text!r}",
+                    f"{base}.type",
+                    at=type_node,
+                )
                 continue
 
             # Restriction: Object-bearing view fields are forbidden outright;
             # non-primitive Pure Data (a user Data type) is a different, still
             # invalid, shape. Split into two codes so the reason is precise.
             if is_object_bearing(expr, env, {}):
-                diags.add(errors.OBJECT_BEARING_VIEW_FIELD, "view field is Object-bearing", f"{base}.type", at=type_node)
+                diags.add(
+                    errors.OBJECT_BEARING_VIEW_FIELD,
+                    "view field is Object-bearing",
+                    f"{base}.type",
+                    at=type_node,
+                )
                 continue
             if not _is_primitive_only(expr):
-                diags.add(errors.INVALID_VIEW_FIELD_TYPE, "view field must be primitive Pure Data", f"{base}.type", at=type_node)
+                diags.add(
+                    errors.INVALID_VIEW_FIELD_TYPE,
+                    "view field must be primitive Pure Data",
+                    f"{base}.type",
+                    at=type_node,
+                )
                 continue
 
             # Optional static value must conform to the (now known primitive)

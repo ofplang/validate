@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ofplang.validate.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YScalar
 
 # Built-in primitive Data types (spec 7.1) and the reserved constructor/trait
 # names. `Numeric` is a trait, not a type, but shares the "reserved, cannot be
@@ -43,7 +43,7 @@ class Atom:
 class ArrayT:
     """``Array<elem>`` — the only v0 type constructor."""
 
-    elem: "TypeExpr"
+    elem: TypeExpr
 
 
 TypeExpr = Atom | ArrayT

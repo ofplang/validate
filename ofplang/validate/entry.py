@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 
 def check_entry(doc: YNode, diags: Diagnostics) -> None:
@@ -106,7 +106,7 @@ def check_process_dependencies(doc: YNode, diags: Diagnostics) -> None:
             graph[pname] = set()
 
     WHITE, GRAY, BLACK = 0, 1, 2
-    color = {p: WHITE for p in known}
+    color = dict.fromkeys(known, WHITE)
 
     def dfs(u: str) -> bool:
         color[u] = GRAY

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.yamlnode import YMap, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YSeq
 
 
 def _child_ctx(ctx: str, key: str) -> str:
@@ -41,7 +41,7 @@ def _child_ctx(ctx: str, key: str) -> str:
     return "generic"
 
 
-def _walk(diags: Diagnostics, node: YNode, base: str, ctx: str) -> None:
+def _walk(diags: Diagnostics, node: YNode | None, base: str, ctx: str) -> None:
     if isinstance(node, YMap):
         code = errors.DUPLICATE_PORT_NAME if ctx == "ports" else errors.DUPLICATE_KEY
         for dup in node.duplicate_keys():

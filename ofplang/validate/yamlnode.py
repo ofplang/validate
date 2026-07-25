@@ -192,7 +192,9 @@ def _convert(node, file: str | None) -> YNode:
                     "mapping keys must be scalars in v0",
                     _pos(key_node.start_mark, file),
                 )
-            key = YScalar(tag=key_node.tag, pos=_pos(key_node.start_mark, file), text=key_node.value)
+            key = YScalar(
+                tag=key_node.tag, pos=_pos(key_node.start_mark, file), text=key_node.value
+            )
             entries.append((key, _convert(value_node, file)))
         return YMap(tag=node.tag, pos=_pos(node.start_mark, file), entries=entries)
 

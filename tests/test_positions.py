@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from ofplang.validate import validate
-from ofplang.validate.cli import main, EXIT_INVALID
+from ofplang.validate.cli import EXIT_INVALID, main
 
 CASES = Path(__file__).parent / "conformance" / "cases"
 

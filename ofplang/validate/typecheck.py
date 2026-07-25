@@ -21,7 +21,7 @@ from ofplang.validate.types import (
     process_type_params,
     resolve_error,
 )
-from ofplang.validate.yamlnode import YMap, YScalar, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar
 
 
 def _check_type_field(
@@ -76,9 +76,16 @@ def _check_ports(
         # reported here (rather than silently resolving to a None-phase / untyped
         # port that would weaken later phase-flow and Object checks).
         if port.get("type") is None:
-            diags.add(errors.MISSING_REQUIRED_KEY, "port requires 'type'", f"{base}.{pname}.type", at=port)
+            diags.add(
+                errors.MISSING_REQUIRED_KEY, "port requires 'type'", f"{base}.{pname}.type", at=port
+            )
         if port.get("phase") is None:
-            diags.add(errors.MISSING_REQUIRED_KEY, "port requires 'phase'", f"{base}.{pname}.phase", at=port)
+            diags.add(
+                errors.MISSING_REQUIRED_KEY,
+                "port requires 'phase'",
+                f"{base}.{pname}.phase",
+                at=port,
+            )
         _check_type_field(diags, port.get("type"), env, tp, f"{base}.{pname}.type")
 
 
@@ -90,7 +97,12 @@ def check_types(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
     if isinstance(types, YMap):
         for name in types.keys():
             if name in RESERVED_TYPE_LIKE:
-                diags.add(errors.REDECLARE_BUILTIN, f"{name!r} is reserved", f"types.{name}", at=types.key_node(name))
+                diags.add(
+                    errors.REDECLARE_BUILTIN,
+                    f"{name!r} is reserved",
+                    f"types.{name}",
+                    at=types.key_node(name),
+                )
 
     processes = doc.get("processes")
     if not isinstance(processes, YMap):

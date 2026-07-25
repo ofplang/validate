@@ -22,7 +22,7 @@ import re
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.validator import EXTENSION_TOLERANT
-from ofplang.validate.yamlnode import YMap, YScalar, YSeq, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Allowed top-level keys (spec 2, 2.3). Sections may be omitted; only
 # `processes` is semantically required (checked below).
@@ -60,7 +60,9 @@ _NODE_ALLOWED = {
     "ordinary": {"id", "process", "state", "bind"},
     "map": {"id", "kind", "process", "each", "bind", "outputs"},
     "fold": {"id", "kind", "process", "each", "carry", "bind", "outputs"},
-    "do_while": {"id", "kind", "process", "carry", "bind", "condition", "max_iterations", "outputs"},
+    "do_while": {
+        "id", "kind", "process", "carry", "bind", "condition", "max_iterations", "outputs"
+    },
     "branch": {"id", "kind", "condition", "args", "then", "else", "outputs"},
 }
 
@@ -158,7 +160,12 @@ def _scan_nulls(diags: Diagnostics, node: YNode, base: str) -> None:
             # Path-based classification keeps this universal scan single-pass
             # without threading view context through the recursion.
             if ".view." in base and base.endswith(".value"):
-                diags.add(errors.NULL_STATIC_VALUE, "null is not a valid static view value", base, at=node)
+                diags.add(
+                    errors.NULL_STATIC_VALUE,
+                    "null is not a valid static view value",
+                    base,
+                    at=node,
+                )
             else:
                 diags.add(errors.NULL_VALUE, "null is not a valid v0 value", base, at=node)
         return
@@ -194,7 +201,7 @@ def _check_spec_version(diags: Diagnostics, doc: YMap) -> None:
         )
 
 
-def _check_process(diags: Diagnostics, pname: str, proc: YNode, mode: str) -> None:
+def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str) -> None:
     """Validate one process mapping's shape and section placement."""
     base = f"processes.{pname}"
     if not isinstance(proc, YMap):
@@ -211,9 +218,19 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode, mode: str) -> No
     # scheduling only on composite (spec 23.3). Emit the specific code and rely
     # on the allowed-set check to skip re-reporting these keys as unknown.
     if kind == "composite" and proc.get("objects") is not None:
-        diags.add(errors.OBJECTS_ON_COMPOSITE, "objects is atomic-only", f"{base}.objects", at=proc.get("objects"))
+        diags.add(
+            errors.OBJECTS_ON_COMPOSITE,
+            "objects is atomic-only",
+            f"{base}.objects",
+            at=proc.get("objects"),
+        )
     if kind == "atomic" and proc.get("scheduling") is not None:
-        diags.add(errors.SCHEDULING_ON_ATOMIC, "scheduling is composite-only", f"{base}.scheduling", at=proc.get("scheduling"))
+        diags.add(
+            errors.SCHEDULING_ON_ATOMIC,
+            "scheduling is composite-only",
+            f"{base}.scheduling",
+            at=proc.get("scheduling"),
+        )
 
     # Closed-key check against the kind's allowed set. Unknown `kind` values are
     # left to a later pass; here we default to the union so we do not spuriously
@@ -241,7 +258,12 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode, mode: str) -> No
                     # Closed section set for the node's kind (spec 2.3, 11, 21).
                     _check_node_sections(diags, item, npath, mode)
                     if item.get("id") is None:
-                        diags.add(errors.MISSING_REQUIRED_KEY, "node requires 'id'", f"{npath}.id", at=item)
+                        diags.add(
+                            errors.MISSING_REQUIRED_KEY,
+                            "node requires 'id'",
+                            f"{npath}.id",
+                            at=item,
+                        )
                     # Most node kinds target a single `process`; `branch` is the
                     # exception — it selects between `then`/`else` arms and so
                     # requires `then` instead of a top-level `process` (spec 20).
@@ -249,7 +271,12 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode, mode: str) -> No
                     is_branch = isinstance(node_kind, YScalar) and node_kind.text == "branch"
                     if is_branch:
                         if item.get("then") is None:
-                            diags.add(errors.MISSING_REQUIRED_KEY, "branch requires 'then'", f"{npath}.then", at=item)
+                            diags.add(
+                                errors.MISSING_REQUIRED_KEY,
+                                "branch requires 'then'",
+                                f"{npath}.then",
+                                at=item,
+                            )
                     elif item.get("process") is None:
                         diags.add(
                             errors.MISSING_REQUIRED_KEY,

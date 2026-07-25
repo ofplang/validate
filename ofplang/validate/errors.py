@@ -158,7 +158,7 @@ INVALID_REFERENCE_SCOPE = "invalid_reference_scope"
 BINDING_SOURCE_ARITY = "binding_source_arity"
 
 
-def _collect_codes() -> "frozenset[str]":
+def _collect_codes() -> frozenset[str]:
     codes = set()
     for name, value in globals().items():
         if name.isupper() and isinstance(value, str) and not name.startswith("_"):
@@ -168,4 +168,4 @@ def _collect_codes() -> "frozenset[str]":
 
 #: Every error code known to the specification vocabulary. Conformance
 #: fixtures may only reference codes in this set.
-ERROR_CODES: "frozenset[str]" = _collect_codes()
+ERROR_CODES: frozenset[str] = _collect_codes()
