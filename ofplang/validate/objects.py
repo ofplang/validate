@@ -231,17 +231,24 @@ def _validate_transform_entry(
         diags.add(errors.PURE_DATA_IN_TRANSFORM, "transform path is Pure Data", base, at=entry)
         return
 
-    # 4. Role typing: all element types must unify to a single T (spec 14.4.1).
+    # 4. Role typing (spec 14.4.1): an 'array' role must be bound to an Array<T>
+    # and an 'elem' role to a bare T, with every T unifying to one type. A
+    # non-Array type bound to an 'array' role (which `_element_type` would drop as
+    # None), or a unification conflict, is a role type mismatch.
     ts: list[TypeExpr] = []
-    for role, rkind in exp_in.items():
-        t = _element_type(rkind, in_types.get(role))
-        if t is not None:
-            ts.append(t)
-    for role, rkind in exp_out.items():
-        t = _element_type(rkind, out_types.get(role))
-        if t is not None:
-            ts.append(t)
-    if any(t != ts[0] for t in ts[1:]):
+    role_mismatch = False
+    for role_types, exp in ((in_types, exp_in), (out_types, exp_out)):
+        for role, rkind in exp.items():
+            expr = role_types.get(role)
+            if expr is None:
+                continue
+            if rkind == "array" and not isinstance(expr, ArrayT):
+                role_mismatch = True
+                continue
+            t = _element_type(rkind, expr)
+            if t is not None:
+                ts.append(t)
+    if role_mismatch or any(t != ts[0] for t in ts[1:]):
         diags.add(errors.TRANSFORM_ROLE_TYPE_MISMATCH, f"inconsistent element type in {kind}", base, at=entry)
 
 

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: transform_role_type_mismatch
+    path: "processes.bad.objects.transform[0]"
+notes: "The array_reverse 'xs' role requires Array<T>, but it is bound to a scalar Sample (spec 14.4.1)."
