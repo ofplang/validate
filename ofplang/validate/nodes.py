@@ -408,7 +408,6 @@ def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None
         if not isinstance(nodes, YSeq):
             continue
         base = f"processes.{pname}.body"
-        processes = doc.get("processes")
 
         for item in nodes.items:
             if not isinstance(item, YMap):
