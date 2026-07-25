@@ -1,0 +1,33 @@
+spec_version: "0.0"
+features:
+  - node_branch
+types:
+  Cup:
+    domain: object
+processes:
+  remake:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      consume: [inputs.cup]
+      create: [outputs.cup]
+  main:
+    kind: composite
+    inputs:
+      cup: { type: Cup, phase: data }
+      flag: { type: Bool, phase: data }
+    body:
+      nodes:
+        - id: pick
+          kind: branch
+          condition:
+            from: inputs.flag
+          args:
+            cup: { from: inputs.cup }
+          then:
+            process: remake
+      returns: {}
+entry: main

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: branch_not_identity_equivalent
+    path: "main.body.nodes.pick.cup"
+notes: "With else omitted, the implicit identity else re-exposes arg 'cup' by identity, but the then arm creates a new cup -- arm-dependent Object identity (spec 20.2, 20.3)."

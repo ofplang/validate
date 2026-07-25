@@ -375,6 +375,21 @@ def _check_branch(
                     f"{base}.nodes.{nid}.{name}",
                     at=node,
                 )
+    elif isinstance(then_def, YMap) and else_arm is None:
+        # Implicit identity else (spec 20.3): the omitted else re-exposes each
+        # Object-bearing argument `name` as output `name` via identity from
+        # `inputs.name`. So the then arm must likewise map each common Object
+        # output from the *same-named* argument; creating it, or mapping it from a
+        # different argument, makes the Object identity depend on the chosen arm.
+        then_src = _map_sources(then_def)
+        for name in sorted(then_obj & else_obj):
+            if then_src.get(name) != name:
+                diags.add(
+                    errors.BRANCH_NOT_IDENTITY_EQUIVALENT,
+                    f"common Object output {name!r} is not identity-equivalent to the implicit else",
+                    f"{base}.nodes.{nid}.{name}",
+                    at=node,
+                )
 
 
 def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None:
