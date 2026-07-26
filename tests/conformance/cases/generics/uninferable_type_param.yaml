@@ -1,0 +1,33 @@
+spec_version: "0.0"
+processes:
+  unwrap:
+    kind: atomic
+    type_params:
+      T:
+        domain: data
+    inputs:
+      xs:
+        type: Array<T>
+        phase: data
+    outputs: {}
+  make_int:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v:
+        type: Int
+        phase: data
+  main:
+    kind: composite
+    inputs: {}
+    body:
+      nodes:
+        - id: mi
+          process: make_int
+        - id: u
+          process: unwrap
+          bind:
+            xs:
+              from: mi.v
+      returns: {}
+entry: main

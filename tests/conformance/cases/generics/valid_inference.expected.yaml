@@ -1,0 +1,5 @@
+outcome: valid
+notes: >
+  Both `a` and `b` are bound from Int sources, so T infers consistently as Int.
+  A correctly-inferred generic invocation must not raise conflicting_inference or
+  uninferable_type_param (spec 8.1); guards against inference false positives.

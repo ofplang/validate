@@ -1,0 +1,47 @@
+spec_version: "0.0"
+processes:
+  combine:
+    kind: atomic
+    type_params:
+      T:
+        domain: data
+    inputs:
+      a:
+        type: T
+        phase: data
+      b:
+        type: T
+        phase: data
+    outputs: {}
+  make_int:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v:
+        type: Int
+        phase: data
+  make_float:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v:
+        type: Float
+        phase: data
+  main:
+    kind: composite
+    inputs: {}
+    body:
+      nodes:
+        - id: mi
+          process: make_int
+        - id: mf
+          process: make_float
+        - id: c
+          process: combine
+          bind:
+            a:
+              from: mi.v
+            b:
+              from: mf.v
+      returns: {}
+entry: main

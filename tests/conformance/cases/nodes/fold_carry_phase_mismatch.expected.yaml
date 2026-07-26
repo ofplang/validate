@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: carry_phase_mismatch
+notes: >
+  The carry output `acc` has phase run but the carried input `acc` has phase
+  data; structured carry compatibility requires a same-phase threaded value
+  (spec 16). run precedes data so ordinary phase flow does not object.

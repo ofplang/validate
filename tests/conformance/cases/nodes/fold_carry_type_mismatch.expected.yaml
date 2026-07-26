@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: carry_type_mismatch
+notes: >
+  The carry output `acc` is Int but the carried input `acc` is Float; structured
+  carry compatibility requires a same-type threaded value (spec 16).

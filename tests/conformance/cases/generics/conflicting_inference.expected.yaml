@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: conflicting_inference
+notes: >
+  Type parameter T is inferred as Int from `a` and Float from `b`; incompatible
+  inferences for one parameter are a validation error (spec 8.1).

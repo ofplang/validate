@@ -139,16 +139,46 @@ def _carry_names(node: YMap) -> list[str]:
 def _check_carry_compat(
     diags: Diagnostics, node: YMap, nid: str, target: ProcSig, base: str
 ) -> None:
-    """Every carry binding needs a same-name output on the target (spec 16).
+    """A carry binding needs a same-name, same-type, same-phase output (spec 16).
 
-    (Same-type/same-phase refinement layers on later; existence is the rule the
-    current cases exercise, and a missing output is the primary failure mode.)
+    A carry name ``c`` is threaded across iterations as the target's input port
+    ``c`` -> output port ``c`` -> next iteration's input ``c``. For that to be
+    well-formed the target must provide an output named ``c`` (existence, the
+    primary failure mode) whose type and phase match the carried input port
+    (spec 16 requires the threaded value be same-name, same-type, same-phase).
     """
     for cname in _carry_names(node):
-        if cname not in target.outputs:
+        out_port = target.outputs.get(cname)
+        if out_port is None:
             diags.add(
                 errors.CARRY_OUTPUT_MISSING,
                 f"carry {cname!r} has no matching output on target process",
+                f"{base}.nodes.{nid}.carry.{cname}",
+                at=node,
+            )
+            continue
+        # Compare against the carried input port. If the target has no such
+        # input the carry binding itself is reported by the reference/linearity
+        # layer (binding to an unknown port), so we leave the type/phase check
+        # to the well-formed case to avoid a duplicate diagnostic.
+        in_port = target.inputs.get(cname)
+        if in_port is None:
+            continue
+        if (
+            in_port.type_expr is not None
+            and out_port.type_expr is not None
+            and in_port.type_expr != out_port.type_expr
+        ):
+            diags.add(
+                errors.CARRY_TYPE_MISMATCH,
+                f"carry {cname!r} output type does not match the carried input",
+                f"{base}.nodes.{nid}.carry.{cname}",
+                at=node,
+            )
+        if in_port.phase != out_port.phase:
+            diags.add(
+                errors.CARRY_PHASE_MISMATCH,
+                f"carry {cname!r} output phase does not match the carried input",
                 f"{base}.nodes.{nid}.carry.{cname}",
                 at=node,
             )

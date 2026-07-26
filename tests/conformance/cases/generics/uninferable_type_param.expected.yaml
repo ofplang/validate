@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: uninferable_type_param
+notes: >
+  `unwrap` expects xs: Array<T> but is bound a scalar Int source, so T matches
+  nothing and cannot be inferred; an uninferable parameter is a validation error
+  (spec 8.1). A parameter is never bound to an Array, so the scalar does not
+  bind T either.

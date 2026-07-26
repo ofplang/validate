@@ -11,9 +11,15 @@ validates the parts that are decidable from a process definition alone:
   * each `where` constraint is a well-formed `TraitName<Param>` naming a known
     trait and a declared parameter.
 
-Constraint *satisfaction* (checking the inferred concrete type implements the
-trait) requires an invocation site and is performed during graph validation by
-the node layer; it is out of scope here.
+Call-site instantiation (`_check_instantiations`) then infers type arguments
+from the input bindings at each node invoking a generic process and reports the
+invocation-level errors of spec 8.1: a parameter that infers two incompatible
+concrete types (`conflicting_inference`), a parameter that cannot be inferred at
+all (`uninferable_type_param`), and a `where` constraint the inferred concrete
+type fails to satisfy (`constraint_not_satisfied`). Inference is deliberately
+conservative: it acts only on source types it can resolve to a concrete atom, so
+an unresolved or `value`-literal binding leaves a parameter indeterminate rather
+than being reported as uninferable.
 """
 
 from __future__ import annotations
@@ -90,20 +96,30 @@ def _unify(
     sexpr: TypeExpr | None,
     params: set[str],
     bindings: dict[str, TypeExpr],
+    conflicts: set[str],
 ) -> None:
     """Infer type-parameter bindings by structural matching (spec 8.1).
 
-    Only the shapes v0 inference needs: a parameter atom binds to the concrete
-    source type; Array matches Array recursively; concrete-vs-concrete is left
-    alone (mismatches there are ordinary type errors handled elsewhere).
+    Only the shapes v0 inference needs: a parameter atom binds to a concrete
+    *atomic* source type (a parameter is never bound to an Array, spec 8/8.1);
+    Array matches Array recursively; concrete-vs-concrete is left alone. When a
+    parameter would bind to two different concrete atoms it is recorded in
+    ``conflicts`` (spec 8.1: incompatible inferences for one parameter are a
+    validation error).
     """
     if sexpr is None:
         return
     if isinstance(pexpr, Atom) and pexpr.name in params:
-        bindings.setdefault(pexpr.name, sexpr)
+        if not isinstance(sexpr, Atom):
+            return  # no Array-to-parameter binding; leaves the param unbound
+        existing = bindings.get(pexpr.name)
+        if existing is None:
+            bindings[pexpr.name] = sexpr
+        elif existing != sexpr:
+            conflicts.add(pexpr.name)
         return
     if isinstance(pexpr, ArrayT) and isinstance(sexpr, ArrayT):
-        _unify(pexpr.elem, sexpr.elem, params, bindings)
+        _unify(pexpr.elem, sexpr.elem, params, bindings, conflicts)
 
 
 def _source_type(
@@ -173,8 +189,14 @@ def _check_instantiations(
             if not params:
                 continue  # not a generic process
 
-            # Infer bindings from each bound input port's source value type.
-            bindings: dict[str, TypeExpr] = {}
+            nid_node = node.get("id")
+            node_id = nid_node.text if isinstance(nid_node, YScalar) else "?"
+
+            # Resolve the source type of each bound input port. A port bound by a
+            # `value` literal, or by a `from` we cannot resolve, contributes no
+            # concrete type here and so leaves its parameters indeterminate
+            # (below) rather than provably uninferable.
+            resolved_src: dict[str, TypeExpr] = {}
             for section in ("state", "bind"):
                 m = node.get(section)
                 if not isinstance(m, YMap):
@@ -187,14 +209,55 @@ def _check_instantiations(
                     frm = entry.get("from")
                     if isinstance(frm, YScalar):
                         src = _source_type(frm.text, comp_sig, sigs, nodes_by_id)
-                        _unify(port.type_expr, src, params, bindings)
+                        if src is not None:
+                            resolved_src[portname] = src
+
+            # Infer bindings by structural matching against the resolved sources.
+            bindings: dict[str, TypeExpr] = {}
+            conflicts: set[str] = set()
+            for portname, src in resolved_src.items():
+                port = target_sig.inputs.get(portname)
+                if port is not None and port.type_expr is not None:
+                    _unify(port.type_expr, src, params, bindings, conflicts)
+
+            # For each parameter, which input ports mention it in their type.
+            param_ports: dict[str, set[str]] = {}
+            for portname, port in target_sig.inputs.items():
+                if port.type_expr is None:
+                    continue
+                for atom in _atoms(port.type_expr) & params:
+                    param_ports.setdefault(atom, set()).add(portname)
+
+            # A parameter that infers two incompatible concrete types is an error
+            # (spec 8.1). A parameter that cannot be inferred at all is an error
+            # too, but we only flag it when every port mentioning it resolved to a
+            # concrete source and matching still failed structurally — otherwise
+            # inference is merely indeterminate (unresolved/`value` source) and
+            # flagging it would be a false positive.
+            base_path = f"processes.{pname}.body.nodes.{node_id}"
+            for param in sorted(conflicts):
+                diags.add(
+                    errors.CONFLICTING_INFERENCE,
+                    f"type parameter {param!r} infers incompatible types",
+                    base_path,
+                    at=node,
+                )
+            for param in sorted(params):
+                if param in bindings or param in conflicts:
+                    continue
+                ports = param_ports.get(param, set())
+                if ports and all(p in resolved_src for p in ports):
+                    diags.add(
+                        errors.UNINFERABLE_TYPE_PARAM,
+                        f"type parameter {param!r} cannot be inferred from the bindings",
+                        base_path,
+                        at=node,
+                    )
 
             # Check each where-constraint against the inferred concrete type.
             where = target_def.get("where")
             if not isinstance(where, YSeq):
                 continue
-            nid_node = node.get("id")
-            node_id = nid_node.text if isinstance(nid_node, YScalar) else "?"
             for item in where.items:
                 if not isinstance(item, YScalar):
                     continue
@@ -202,6 +265,8 @@ def _check_instantiations(
                 if not cm:
                     continue  # malformed constraint reported at definition
                 trait, param = cm.group(1), cm.group(2)
+                if param in conflicts:
+                    continue  # ambiguous inference already reported
                 concrete = bindings.get(param)
                 if not isinstance(concrete, Atom):
                     continue  # could not infer a concrete atom; skip

@@ -113,6 +113,11 @@ PURE_DATA_IN_TRANSFORM = "pure_data_in_transform"
 
 # --- Structured nodes (spec 16-21) ----------------------------------------
 CARRY_OUTPUT_MISSING = "carry_output_missing"
+# A carry output exists but does not match the carried input port's type or
+# phase, violating structured carry compatibility (spec 16): the value threaded
+# across iterations must be same-name, same-type, and same-phase.
+CARRY_TYPE_MISMATCH = "carry_type_mismatch"
+CARRY_PHASE_MISMATCH = "carry_phase_mismatch"
 CARRY_OUTPUT_NOT_CARRY_MODE = "carry_output_not_carry_mode"
 ONE_SIDED_OBJECT_OUTPUT = "one_sided_object_output"
 BRANCH_NOT_IDENTITY_EQUIVALENT = "branch_not_identity_equivalent"
