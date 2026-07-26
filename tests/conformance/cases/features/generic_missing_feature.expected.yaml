@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: missing_required_feature
+    path: "features"
+notes: "a type_params section requires generic_processes; the explicit features section omits it (spec 4.3)."

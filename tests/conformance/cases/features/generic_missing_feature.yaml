@@ -1,0 +1,24 @@
+spec_version: "0.0"
+features: []
+processes:
+  wash:
+    kind: atomic
+    type_params:
+      O:
+        domain: object
+    inputs:
+      item:
+        type: O
+        phase: data
+    outputs:
+      item:
+        type: O
+        phase: data
+    objects:
+      map:
+        outputs.item: inputs.item
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

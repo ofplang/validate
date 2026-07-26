@@ -2,9 +2,10 @@
 
 Intent: `features` is canonical when written but derivable when omitted. Feature
 derivation is deliberately syntactic (spec 4.3) — it reads node `kind` values, a
-`script.language: python`, and the presence of a `scheduling` section — so it is
-cheap and unambiguous to check. When `features` is present it must list every
-derived (required) feature and may list only v0-defined names.
+`type_params` section, a `script.language: python`, and the presence of a
+`scheduling` section — so it is cheap and unambiguous to check. When `features`
+is present it must list every derived (required) feature and may list only
+v0-defined names.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ V0_FEATURES = frozenset(
         "node_fold",
         "node_do_while",
         "node_branch",
+        "generic_processes",
         "python_script_processes",
         "scheduling_policies",
     }
@@ -57,6 +59,10 @@ def derive_required(doc: YMap) -> set[str]:
                         kind = item.get("kind")
                         if isinstance(kind, YScalar) and kind.text in _KIND_FEATURE:
                             required.add(_KIND_FEATURE[kind.text])
+
+        # A generic process: one that declares a `type_params` section (spec 4.3).
+        if proc.get("type_params") is not None:
+            required.add("generic_processes")
 
         # Python script processes: a script section written for python.
         script = proc.get("script")

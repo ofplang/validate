@@ -1,0 +1,2 @@
+outcome: valid
+notes: "a type_params section requires generic_processes, which is declared (spec 4.3)."
