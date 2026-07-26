@@ -1,13 +1,34 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ofplang-validate"
-version = "0.0.0"
 description = "Object-flow programming language v0 validator"
 requires-python = ">=3.10"
+dynamic = ["version"]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Kazunari Kaizu", email = "kwaizu@gmail.com" }]
+keywords = ["ofplang", "dataflow", "workflow", "validator", "yaml"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Compilers",
+    "Typing :: Typed",
+]
 dependencies = ["PyYAML>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/ofplang/validate"
+Repository = "https://github.com/ofplang/validate"
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
@@ -18,12 +39,20 @@ dev = ["pytest>=7.0", "ruff>=0.16", "mypy>=1.11", "types-PyYAML"]
 # `ofp validate`.
 ofp-validate = "ofplang.validate.cli:main"
 
+# Version is derived from git tags (e.g. `v0.1.0`) by setuptools-scm; there is no
+# static version in this file.
+[tool.setuptools_scm]
+
 # `ofplang` is a PEP 420 namespace shared across the org's repos (validate,
 # schedule, run, …); this distribution provides only the `ofplang.validate`
 # package under it.
 [tool.setuptools.packages.find]
 include = ["ofplang*"]
 namespaces = true
+
+# Ship the PEP 561 marker so downstreams see this package as typed.
+[tool.setuptools.package-data]
+"ofplang.validate" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
