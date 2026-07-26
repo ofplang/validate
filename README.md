@@ -1,6 +1,7 @@
 # ofplang validate
 
 [![CI](https://github.com/ofplang/validate/actions/workflows/ci.yml/badge.svg)](https://github.com/ofplang/validate/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/ofplang-validate.svg)](https://pypi.org/project/ofplang-validate/)
 
 A validator for **Object-flow Programming Language v0** — a YAML-based dataflow
 workflow IR with linear Object tracking. The language is defined in the
@@ -14,10 +15,15 @@ than free text, so results are easy to consume in tests and tooling.
 ## Install
 
 ```sh
-pip install -e ".[test]"
+pip install ofplang-validate
 ```
 
-Requires Python 3.10+. The only runtime dependency is PyYAML.
+Requires Python 3.10+. The only runtime dependency is PyYAML. For development,
+install editable with the test extra from a clone:
+
+```sh
+pip install -e ".[test]"
+```
 
 ## Command line
 
