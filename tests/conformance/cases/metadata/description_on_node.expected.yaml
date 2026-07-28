@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.body.nodes[0].description"
+notes: >
+  v0 defines description only at the document root and at trait, type, and
+  process definitions; on a node it is an unknown key (spec 2.7, 2.3).

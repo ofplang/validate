@@ -1,0 +1,2 @@
+outcome: valid
+notes: "description is an allowed optional key on a process definition (spec 2.7)."

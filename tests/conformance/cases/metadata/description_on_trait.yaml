@@ -1,0 +1,9 @@
+traits:
+  Washable:
+    description: "Marks Objects that can be washed."
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

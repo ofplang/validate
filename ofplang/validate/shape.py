@@ -1,4 +1,4 @@
-"""Closed-shape structural validation (spec 2.1, 2.3, 10).
+"""Closed-shape structural validation (spec 2.1, 2.3, 2.7, 10).
 
 Intent: portable v0 YAML is closed by default — at every defined mapping
 position only spec-defined keys are allowed, and unknown keys are errors
@@ -25,21 +25,25 @@ from ofplang.validate.validator import EXTENSION_TOLERANT
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Allowed top-level keys (spec 2, 2.3). Sections may be omitted; only
-# `processes` is semantically required (checked below).
-_TOP_LEVEL_KEYS = {"spec_version", "features", "traits", "types", "processes", "entry"}
+# `processes` is semantically required (checked below). `description` is
+# optional metadata allowed at the document root (spec 2.7).
+_TOP_LEVEL_KEYS = {
+    "spec_version", "features", "traits", "types", "processes", "entry", "description",
+}
 
 # Per-kind allowed process keys. The *misplaced* section variants — `objects`
 # on a composite, `scheduling` on an atomic — get their own specific codes
 # (spec 10.2, 23.3). To avoid also reporting them as generic unknown keys, both
 # section names are included in *both* allowed sets: placement is judged by the
 # dedicated checks below, not by the closed-key check.
+# `description` is optional metadata allowed on a process definition (spec 2.7).
 _ATOMIC_KEYS = {
     "kind", "inputs", "outputs", "objects", "scheduling", "script",
-    "type_params", "where", "traits", "contracts",
+    "type_params", "where", "traits", "contracts", "description",
 }
 _COMPOSITE_KEYS = {
     "kind", "inputs", "outputs", "body", "objects", "scheduling",
-    "type_params", "where", "traits", "contracts",
+    "type_params", "where", "traits", "contracts", "description",
 }
 
 # Every binding / output-control section name a node may legally carry, across
@@ -201,6 +205,47 @@ def _check_spec_version(diags: Diagnostics, doc: YMap) -> None:
         )
 
 
+def _check_description(diags: Diagnostics, mapping: YMap, path: str) -> None:
+    """Validate one optional `description` metadata value (spec 2.7).
+
+    `description` must be a YAML string scalar. A null is left to the null scan
+    (spec 2.3), so we stay silent on null to avoid double-reporting, mirroring
+    `_check_spec_version`. Any other non-string value is malformed.
+    """
+    node = mapping.get("description")
+    if node is None:
+        return  # optional at every position that allows it
+    if isinstance(node, YScalar) and node.is_null:
+        return  # a null was already reported by the null scan
+    if not (isinstance(node, YScalar) and node.is_str):
+        diags.add(
+            errors.MALFORMED_DESCRIPTION,
+            "description must be a string scalar",
+            path,
+            at=node,
+        )
+
+
+def _check_descriptions(diags: Diagnostics, doc: YMap) -> None:
+    """Validate `description` metadata at the four positions v0 defines it
+    (spec 2.7): the document root, and trait, type, and process definitions.
+
+    Only the value kind is checked here. Whether `description` is an *allowed*
+    key at a closed position (the document root and processes) is enforced by
+    the closed-key checks; at trait and type definitions `description` rides
+    along as metadata and is validated for kind only.
+    """
+    _check_description(diags, doc, "description")
+    for section in ("traits", "types", "processes"):
+        block = doc.get(section)
+        if not isinstance(block, YMap):
+            continue
+        for name in block.keys():
+            decl = block.get(name)
+            if isinstance(decl, YMap):
+                _check_description(diags, decl, f"{section}.{name}.description")
+
+
 def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str) -> None:
     """Validate one process mapping's shape and section placement."""
     base = f"processes.{pname}"
@@ -300,6 +345,7 @@ def check_shape(doc: YNode, diags: Diagnostics, mode: str) -> None:
     _scan_nulls(diags, doc, "<root>")
     _check_closed_map(diags, doc, _TOP_LEVEL_KEYS, "<root>", mode)
     _check_spec_version(diags, doc)
+    _check_descriptions(diags, doc)
 
     processes = doc.get("processes")
     if processes is None:

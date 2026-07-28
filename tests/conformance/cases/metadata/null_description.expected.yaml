@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: null_value
+    path: "description"
+notes: >
+  A null description is reported by the universal null scan (spec 2.3), not as
+  malformed_description, to avoid double-reporting (spec 2.7).

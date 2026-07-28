@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: malformed_description
+    path: "description"
+notes: "description must be a string scalar; an integer is malformed (spec 2.7)."

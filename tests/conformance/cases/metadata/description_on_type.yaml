@@ -1,0 +1,10 @@
+types:
+  Sample:
+    domain: object
+    description: "A biological sample; view-field meaning is folded into this text."
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

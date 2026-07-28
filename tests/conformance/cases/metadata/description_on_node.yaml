@@ -1,0 +1,15 @@
+processes:
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - id: step
+          process: noop
+          description: "description is not defined on a node (spec 2.7)"
+  noop:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

@@ -1,0 +1,7 @@
+description: 42
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

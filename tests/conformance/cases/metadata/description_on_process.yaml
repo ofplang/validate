@@ -1,0 +1,7 @@
+processes:
+  main:
+    kind: atomic
+    description: "The entry process; port meaning is folded into this text."
+    inputs: {}
+    outputs: {}
+entry: main

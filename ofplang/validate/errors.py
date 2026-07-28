@@ -22,8 +22,11 @@ WRONG_VALUE_KIND = "wrong_value_kind"
 SECTION_NOT_VALID_FOR_KIND = "section_not_valid_for_kind"
 OBJECTS_ON_COMPOSITE = "objects_on_composite"
 
-# --- Reserved metadata (spec 2.1) -----------------------------------------
+# --- Reserved metadata (spec 2.1, 2.7) ------------------------------------
 MALFORMED_SPEC_VERSION = "malformed_spec_version"
+# `description` present but not a string scalar (spec 2.7). A null value is
+# reported by the universal null scan instead, to avoid double-reporting.
+MALFORMED_DESCRIPTION = "malformed_description"
 
 # --- Identifiers and reserved names (spec 2.4) ----------------------------
 INVALID_IDENTIFIER = "invalid_identifier"

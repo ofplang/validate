@@ -1,0 +1,7 @@
+description: "A demonstration workflow; description is optional root metadata."
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main
