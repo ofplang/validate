@@ -6,6 +6,7 @@ from ofplang.validate.validator import (
     STRICT,
     Diagnostic,
     ValidationResult,
+    expand,
     validate,
 )
 
@@ -13,6 +14,7 @@ __all__ = [
     "Diagnostic",
     "ValidationResult",
     "validate",
+    "expand",
     "STRICT",
     "EXTENSION_TOLERANT",
     "MODES",

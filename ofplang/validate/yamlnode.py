@@ -239,3 +239,38 @@ def load_document(path: str | Path) -> YNode:
     except OSError as exc:
         raise YamlError("unreadable_import", f"cannot read {p}: {exc}") from exc
     return compose_document(text, str(p))
+
+
+def to_plain(node: YNode) -> object:
+    """Convert a node tree into the plain Python value ``yaml.safe_load`` would
+    produce for the same source.
+
+    The node layer deliberately preserves tags, duplicate keys, and positions so
+    the *validator* can inspect them (see the module docstring); a consumer that
+    only wants the value — e.g. the ``$import``-expanded document a scheduler or
+    runner executes — reconstructs the ordinary Python value here. Fidelity with
+    ``safe_load`` is exact by construction: each scalar is handed to the same
+    :class:`yaml.constructor.SafeConstructor` PyYAML itself uses, keyed by the
+    resolved tag we retained, so int/float/bool/null/str *and* less-common tags
+    (timestamps become ``datetime``) all resolve identically. Duplicate mapping
+    keys collapse last-wins, matching ``safe_load`` (they are reported separately
+    by the ``duplicates`` pass); sequences become lists.
+    """
+    # One constructor per document walk: it memoizes by node identity, and our
+    # synthetic ScalarNodes are all distinct, so nothing is reused stale.
+    ctor = yaml.constructor.SafeConstructor()
+
+    def go(n: YNode) -> object:
+        if isinstance(n, YScalar):
+            # Reconstruct via the retained tag rather than re-resolving the text,
+            # so a quoted "123" (tag str) stays the string "123", not the int 123.
+            return ctor.construct_object(yaml.ScalarNode(n.tag, n.text))
+        if isinstance(n, YSeq):
+            return [go(item) for item in n.items]
+        if isinstance(n, YMap):
+            # dict assignment keeps the first-seen key position with the last
+            # value — exactly safe_load's duplicate-key behavior.
+            return {key.text: go(value) for key, value in n.entries}
+        return None
+
+    return go(node)

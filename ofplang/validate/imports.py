@@ -168,7 +168,7 @@ def _expand(node: YNode, current_file: Path, stack: list[Path]) -> YNode:
     return node
 
 
-def load_expanded(source: str | Path) -> YNode:
+def load_expanded(source: str | Path, base_dir: str | Path | None = None) -> YNode:
     """Load the root document and return its fully import-expanded tree.
 
     This is the single entry point the validator uses in place of a bare load:
@@ -177,9 +177,20 @@ def load_expanded(source: str | Path) -> YNode:
     detected at the merging map position in ``_expand``). Plain source-document
     duplicate keys are not fatal; they are reported non-fatally by the
     ``duplicates`` pass on the expanded tree.
+
+    ``base_dir`` overrides the directory the *root* document's relative imports
+    resolve against (spec 3.1); by default that is the directory containing
+    ``source``. Nested imports always resolve relative to their own file, so
+    ``base_dir`` affects only the root's direct ``$import`` paths — useful when a
+    document's on-disk location differs from its logical one (e.g. a temp copy).
     """
     # Resolve for cycle identity, but load via the path as given so the root's
     # diagnostics display the same (often relative) path the caller passed.
     root_path = Path(source).resolve()
     root = load_document(source)
-    return _expand(root, root_path, [root_path])
+    # The anchor is a synthetic path whose *parent* is the resolution base:
+    # `_resolve_path` joins imports onto `current_file.parent`, so pointing the
+    # parent at `base_dir` redirects the root's relative imports without touching
+    # cycle identity (which stays keyed on the real `root_path`).
+    anchor = Path(base_dir) / root_path.name if base_dir is not None else root_path
+    return _expand(root, anchor, [root_path])

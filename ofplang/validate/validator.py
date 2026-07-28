@@ -55,6 +55,12 @@ class Diagnostic:
 @dataclass
 class ValidationResult:
     diagnostics: list[Diagnostic] = field(default_factory=list)
+    # The import-expanded document as plain Python (what ``yaml.safe_load`` would
+    # yield for the fully-resolved tree), populated only when ``validate`` is
+    # called with ``expand=True`` and load + ``$import`` resolution succeeded;
+    # otherwise ``None``. It lets a front door validate and obtain the exact
+    # document to execute in one pass, instead of re-reading the unexpanded file.
+    document: dict | None = None
 
     @property
     def ok(self) -> bool:
@@ -70,6 +76,7 @@ def validate(
     *,
     mode: str = STRICT,
     base_dir: str | Path | None = None,
+    expand: bool = False,
 ) -> ValidationResult:
     """Validate an ofplang v0 document rooted at ``source``.
 
@@ -83,6 +90,13 @@ def validate(
     base_dir:
         Optional base directory for resolving relative ``$import`` paths.
         Defaults to the directory containing ``source``.
+    expand:
+        When ``True``, populate :attr:`ValidationResult.document` with the plain
+        Python form of the import-expanded tree (see :func:`expand`) whenever
+        load + ``$import`` resolution succeeds — even if later passes report
+        errors. Lets a front door validate and obtain the exact document to
+        execute in a single pass. Defaults to ``False`` (no extra work, and the
+        result's ``document`` stays ``None``).
 
     The pipeline follows the spec's processing order (spec 2.2): load, then a
     sequence of passes each appending to a shared :class:`Diagnostics` sink.
@@ -109,7 +123,7 @@ def validate(
     from ofplang.validate.imports import load_expanded
     from ofplang.validate.objects import build_signatures
     from ofplang.validate.types import build_env
-    from ofplang.validate.yamlnode import YamlError, YMap
+    from ofplang.validate.yamlnode import YamlError, YMap, to_plain
 
     if mode not in MODES:
         raise ValueError(f"unknown validation mode: {mode!r}")
@@ -119,13 +133,17 @@ def validate(
     # Step 1: load and import-expand the document (spec 2.2 step 1). Both YAML
     # load failures and structural import failures are fatal — nothing can be
     # validated without a fully expanded tree — so they surface as the sole
-    # diagnostic and stop.
+    # diagnostic and stop (with `document` left None, since there is no tree).
     try:
-        root = load_expanded(source)
+        root = load_expanded(source, base_dir)
     except YamlError as exc:
         # Surface the failure's own position (file/line) when it has one.
         diags.add(exc.code, exc.message, at=exc.pos)
         return diags.result()
+
+    # The expanded document is available now that load succeeded; capture it up
+    # front (when requested) so it is returned even if later passes find errors.
+    document = to_plain(root) if expand else None
 
     # Step 2: structural shape, reserved-key, and metadata-format checks.
     shape_pass.check_shape(root, diags, mode)
@@ -163,4 +181,32 @@ def validate(
     entry_pass.check_entry(root, diags)
     entry_pass.check_process_dependencies(root, diags)
 
-    return diags.result()
+    result = diags.result()
+    result.document = document  # type: ignore[assignment]  # dict for a valid v0 root
+    return result
+
+
+def expand(source: str | Path, *, base_dir: str | Path | None = None) -> dict:
+    """Return the fully ``$import``-expanded document rooted at ``source`` as
+    plain Python (spec 2.2 step 1 / spec 3).
+
+    This is the structural expansion step on its own — load, resolve every
+    ``$import``, and convert to the plain value ``yaml.safe_load`` would produce
+    for the resolved tree. It performs no v0 validation; a front door that also
+    wants diagnostics should call :func:`validate` with ``expand=True`` instead,
+    which does both in one pass.
+
+    Raises :class:`~ofplang.validate.yamlnode.YamlError` for any structural
+    import failure (unreadable target, cycle, multi-document target, wrong-shape
+    merge, duplicate key after merge, …) — the same failures that make the whole
+    document unusable for validation. ``base_dir`` overrides where the root's
+    relative imports resolve (see :func:`~ofplang.validate.imports.load_expanded`).
+
+    A syntactically valid but non-mapping root (a bare scalar or sequence) is
+    returned as-is; callers that require a mapping (e.g. a scheduler or runner
+    front door) make that check themselves.
+    """
+    from ofplang.validate.imports import load_expanded
+    from ofplang.validate.yamlnode import to_plain
+
+    return to_plain(load_expanded(source, base_dir))  # type: ignore[return-value]

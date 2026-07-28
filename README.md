@@ -67,6 +67,31 @@ if not result.ok:
 validator collects all independent findings rather than stopping at the first;
 only a YAML parse or `$import` resolution failure is terminal.
 
+### Expanded document
+
+`$import` (spec §3) is *structural* inclusion resolved before any other checks,
+so the document that gets validated is the fully expanded one. To obtain that
+expanded document — e.g. to hand a downstream tool the exact form it should
+schedule or run, instead of re-reading the unexpanded file — use:
+
+```python
+from ofplang.validate import validate, expand
+
+# structural expansion only (no validation); raises YamlError on import failure
+doc = expand("workflow.yaml")
+
+# validate and get the expanded document in one pass
+result = validate("workflow.yaml", mode="extension-tolerant", expand=True)
+if result.ok:
+    run_it(result.document)   # exactly what was validated
+```
+
+`expand(source, *, base_dir=None)` returns the plain-Python document
+`yaml.safe_load` would yield for the resolved tree (fidelity is exact, including
+non-string scalar tags). `base_dir` overrides where the root's relative imports
+resolve. `validate(..., expand=True)` sets `ValidationResult.document` to that
+same value whenever load + `$import` resolution succeeds (otherwise `None`).
+
 The package lives under the `ofplang` PEP 420 namespace (`ofplang.validate`),
 shared across the organization's tools.
 
