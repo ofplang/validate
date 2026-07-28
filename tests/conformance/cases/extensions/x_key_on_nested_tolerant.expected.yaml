@@ -1,0 +1,6 @@
+mode: extension-tolerant
+outcome: valid
+notes: >
+  Extension-key gating flows uniformly into the newly-closed nested positions:
+  an x- key on a type definition and on a port is accepted in tolerant mode
+  (spec 26).

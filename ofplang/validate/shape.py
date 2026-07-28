@@ -1,4 +1,4 @@
-"""Closed-shape structural validation (spec 2.1, 2.3, 2.7, 10).
+"""Closed-shape structural validation (spec 2.1, 2.3, 2.7, 6, 7, 8, 10).
 
 Intent: portable v0 YAML is closed by default — at every defined mapping
 position only spec-defined keys are allowed, and unknown keys are errors
@@ -45,6 +45,19 @@ _COMPOSITE_KEYS = {
     "kind", "inputs", "outputs", "body", "objects", "scheduling",
     "type_params", "where", "traits", "contracts", "description",
 }
+
+# Closed key sets for the type/trait layer and process port/type-param
+# declarations (spec 2.3, 7.2, 7.4, 6, 8). `description` is allowed only on the
+# trait and type *definitions* (spec 2.7); it is deliberately absent from the
+# view-field, port, and type-parameter sets so that a `description` there is an
+# unknown key. Non-mapping declarations at these positions are left untouched:
+# closedness applies to mappings only, and their malformedness surfaces (or is
+# tolerated) in the type-resolution passes as today.
+_TRAIT_KEYS = {"description"}
+_TYPE_KEYS = {"domain", "implements", "view", "description"}
+_VIEW_FIELD_KEYS = {"type", "value"}
+_PORT_KEYS = {"type", "phase"}
+_TYPE_PARAM_KEYS = {"domain"}
 
 # Every binding / output-control section name a node may legally carry, across
 # all kinds. A key outside this set on a node is an unknown key; a key inside it
@@ -246,6 +259,38 @@ def _check_descriptions(diags: Diagnostics, doc: YMap) -> None:
                 _check_description(diags, decl, f"{section}.{name}.description")
 
 
+def _check_types_and_traits(diags: Diagnostics, doc: YMap, mode: str) -> None:
+    """Close the type/trait layer's declaration mappings (spec 2.3, 7.2, 7.4).
+
+    Each trait definition, type definition, and view-field declaration is a
+    closed mapping. Only mappings are inspected; a non-mapping declaration is
+    left to the type-resolution passes (it simply fails to resolve there), so
+    this pass does not add a value-kind error for it.
+    """
+    traits = doc.get("traits")
+    if isinstance(traits, YMap):
+        for name in traits.keys():
+            decl = traits.get(name)
+            if isinstance(decl, YMap):
+                _check_closed_map(diags, decl, _TRAIT_KEYS, f"traits.{name}", mode)
+
+    types = doc.get("types")
+    if isinstance(types, YMap):
+        for name in types.keys():
+            decl = types.get(name)
+            if not isinstance(decl, YMap):
+                continue
+            _check_closed_map(diags, decl, _TYPE_KEYS, f"types.{name}", mode)
+            view = decl.get("view")
+            if isinstance(view, YMap):
+                for fname in view.keys():
+                    field = view.get(fname)
+                    if isinstance(field, YMap):
+                        _check_closed_map(
+                            diags, field, _VIEW_FIELD_KEYS, f"types.{name}.view.{fname}", mode
+                        )
+
+
 def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str) -> None:
     """Validate one process mapping's shape and section placement."""
     base = f"processes.{pname}"
@@ -287,6 +332,28 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
     else:
         allowed = _ATOMIC_KEYS | _COMPOSITE_KEYS
     _check_closed_map(diags, proc, allowed, base, mode)
+
+    # Close the process's type-parameter and port declaration mappings
+    # (spec 6, 8). `type`/`phase` *presence* on a port is a required-key concern
+    # owned by the type pass; here we only reject unknown keys, so a port
+    # carrying e.g. `description` (spec 2.7 does not define it there) is flagged.
+    type_params = proc.get("type_params")
+    if isinstance(type_params, YMap):
+        for tpname in type_params.keys():
+            decl = type_params.get(tpname)
+            if isinstance(decl, YMap):
+                _check_closed_map(
+                    diags, decl, _TYPE_PARAM_KEYS, f"{base}.type_params.{tpname}", mode
+                )
+    for section in ("inputs", "outputs"):
+        ports = proc.get(section)
+        if isinstance(ports, YMap):
+            for portname in ports.keys():
+                port = ports.get(portname)
+                if isinstance(port, YMap):
+                    _check_closed_map(
+                        diags, port, _PORT_KEYS, f"{base}.{section}.{portname}", mode
+                    )
 
     # Composite body: each node must carry an `id` and a `process` target
     # (spec 11). Deeper per-kind node shape is validated in the node layer.
@@ -346,6 +413,7 @@ def check_shape(doc: YNode, diags: Diagnostics, mode: str) -> None:
     _check_closed_map(diags, doc, _TOP_LEVEL_KEYS, "<root>", mode)
     _check_spec_version(diags, doc)
     _check_descriptions(diags, doc)
+    _check_types_and_traits(diags, doc, mode)
 
     processes = doc.get("processes")
     if processes is None:

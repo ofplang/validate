@@ -1,0 +1,13 @@
+processes:
+  main:
+    kind: atomic
+    type_params:
+      T:
+        domain: data
+        bogus: 1
+    inputs:
+      x:
+        type: T
+        phase: data
+    outputs: {}
+entry: main

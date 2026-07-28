@@ -1,0 +1,10 @@
+types:
+  Sample:
+    domain: object
+    bogus: 1
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

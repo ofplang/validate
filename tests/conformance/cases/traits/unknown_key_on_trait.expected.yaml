@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "traits.Washable.bogus"
+notes: >
+  A trait definition is a nominal marker; the only key it may carry is the
+  optional description (spec 2.3, 7.3, 2.7).

@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.inputs.x.description"
+notes: >
+  v0 defines description only at the document root and at trait, type, and
+  process definitions; on a port it is an unknown key. Port meaning is folded
+  into the enclosing process description (spec 2.7).

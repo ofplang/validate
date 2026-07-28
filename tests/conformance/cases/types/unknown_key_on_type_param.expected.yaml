@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.type_params.T.bogus"
+notes: "A type-parameter declaration is a closed mapping: domain only (spec 2.3, 8)."

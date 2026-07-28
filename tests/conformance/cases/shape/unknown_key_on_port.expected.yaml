@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.inputs.x.bogus"
+notes: "A port declaration is a closed mapping: type/phase only (spec 2.3, 6)."

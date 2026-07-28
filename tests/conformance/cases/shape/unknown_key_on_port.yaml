@@ -1,0 +1,10 @@
+processes:
+  main:
+    kind: atomic
+    inputs:
+      x:
+        type: Int
+        phase: data
+        bogus: 1
+    outputs: {}
+entry: main

@@ -1,0 +1,6 @@
+mode: strict
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.inputs.x.x-vendor"
+notes: "An x- key on a port is not strict portable v0 unless run extension-tolerant (spec 2.3, 26)."

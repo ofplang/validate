@@ -1,0 +1,11 @@
+spec_version: "0.0"
+processes:
+  main:
+    kind: atomic
+    inputs:
+      x:
+        type: Int
+        phase: data
+        x-vendor: something
+    outputs: {}
+entry: main

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "types.Sample.bogus"
+notes: "A type definition is a closed mapping: domain/implements/view/description only (spec 2.3, 7.2)."

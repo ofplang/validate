@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "types.Image.view.width.description"
+notes: >
+  v0 defines description only at the document root and at trait, type, and
+  process definitions; on a view field it is an unknown key. View-field meaning
+  is folded into the enclosing type description (spec 2.7).

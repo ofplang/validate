@@ -1,0 +1,13 @@
+types:
+  Image:
+    domain: data
+    view:
+      width:
+        type: Int
+        description: "descriptions are not defined on view fields"
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

@@ -1,0 +1,13 @@
+types:
+  Image:
+    domain: data
+    view:
+      width:
+        type: Int
+        bogus: 1
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main
