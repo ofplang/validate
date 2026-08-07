@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: malformed_reference
+    path: "processes.main.body.nodes.n.bind.x"
+notes: >-
+  A body dataflow reference is `inputs.<port>` or `<node>.<output>` and must not
+  carry `.view`, which belongs to contract references alone (spec 2.6.1, 2.6.5).
+  Three segments do not parse as either form, so this is malformed rather than
+  unknown.

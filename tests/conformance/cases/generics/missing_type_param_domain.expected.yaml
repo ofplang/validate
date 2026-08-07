@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: missing_type_param_domain
+  - code: unknown_type
+notes: >-
+  Each type parameter declaration must specify a domain (spec 8); omitting it is
+  distinct from naming an invalid one. The `unknown_type` follow-on is the same
+  cascade as bad_type_param_domain.

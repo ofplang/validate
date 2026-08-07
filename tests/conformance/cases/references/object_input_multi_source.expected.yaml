@@ -1,0 +1,11 @@
+outcome: invalid
+errors:
+  - code: object_input_multi_source
+  - code: object_fanout
+  - code: object_via_bind
+notes: >-
+  An Object-bearing input port has indegree exactly 1 (spec 12.2); binding `cup`
+  in both `state` and `bind` gives it two. The other two codes are the same
+  mistake seen from the other ends and are reported honestly rather than
+  suppressed: `m.cup` now feeds two places (fan-out is forbidden for an
+  Object-bearing output, spec 12.2), and `bind` is Pure Data only (spec 11).

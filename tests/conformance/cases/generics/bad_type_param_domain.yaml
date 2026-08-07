@@ -1,0 +1,19 @@
+spec_version: "0.0"
+features:
+  - generic_processes
+processes:
+  gen:
+    kind: atomic
+    type_params:
+      T:
+        domain: thing
+    inputs:
+      x:
+        type: T
+        phase: data
+  main:
+    kind: composite
+    body:
+      nodes: []
+      returns: {}
+entry: main

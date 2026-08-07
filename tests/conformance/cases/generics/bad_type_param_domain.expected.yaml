@@ -1,0 +1,10 @@
+outcome: invalid
+errors:
+  - code: bad_type_param_domain
+  - code: unknown_type
+notes: >-
+  A type parameter's domain must be `data` or `object` (spec 8). The
+  `unknown_type` is the follow-on: a parameter whose domain does not resolve is
+  not entered into the type environment, so the port typed `T` finds no such
+  atom. Pinned as-is so the cascade is a deliberate, visible choice rather than
+  something a later change alters silently.
