@@ -389,6 +389,19 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
                 # The trait must be `Numeric` (built-in) or a declared trait.
                 if trait != "Numeric" and trait not in env.traits:
                     diags.add(errors.UNKNOWN_TRAIT, f"unknown trait {trait!r}", cpath, at=item)
+                elif trait == "Numeric" and tp[param] == "object":
+                    # `Numeric` is satisfied only by the primitive Data types Int
+                    # and Float, so it may be written only over a `domain: data`
+                    # parameter (spec 8). A constraint over an object-domain one
+                    # can never hold, which makes it a *definition*-level error --
+                    # reported here rather than waiting for a call site, since an
+                    # uninvoked generic process would otherwise never be checked.
+                    diags.add(
+                        errors.MALFORMED_CONSTRAINT,
+                        "Numeric applies only to a data-domain type parameter",
+                        cpath,
+                        at=item,
+                    )
 
     # Call-site instantiation: infer type arguments and check where-constraints.
     _check_instantiations(doc, diags, env, sigs)

@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  The counterpart of numeric_on_object_param: Numeric over a `domain: data`
+  parameter is exactly what spec 8 allows, and Float satisfies it at the call
+  site. Pins that the new definition-level check does not reject the legal form.

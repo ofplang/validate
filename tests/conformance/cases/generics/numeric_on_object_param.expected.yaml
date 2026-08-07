@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: malformed_constraint
+    path: "processes.weigh.where[0]"
+notes: >-
+  Numeric is satisfied only by Int and Float, so it may be written only over a
+  `domain: data` type parameter (spec 8). This is a definition-level error: the
+  process is never invoked here, so a call-site-only check would miss it.

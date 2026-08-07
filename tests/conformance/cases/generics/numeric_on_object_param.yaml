@@ -1,0 +1,31 @@
+spec_version: "0.0"
+features:
+  - generic_processes
+types:
+  Rock:
+    domain: object
+processes:
+  weigh:
+    kind: atomic
+    type_params:
+      O:
+        domain: object
+    where:
+      - Numeric<O>
+    inputs:
+      item:
+        type: O
+        phase: data
+    outputs:
+      item:
+        type: O
+        phase: data
+    objects:
+      map:
+        outputs.item: inputs.item
+  main:
+    kind: composite
+    body:
+      nodes: []
+      returns: {}
+entry: main

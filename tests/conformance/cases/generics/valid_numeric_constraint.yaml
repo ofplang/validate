@@ -1,0 +1,40 @@
+spec_version: "0.0"
+features:
+  - generic_processes
+processes:
+  halve:
+    kind: atomic
+    type_params:
+      T:
+        domain: data
+    where:
+      - Numeric<T>
+    inputs:
+      x:
+        type: T
+        phase: data
+    outputs:
+      y:
+        type: T
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      x:
+        type: Float
+        phase: data
+    outputs:
+      y:
+        type: Float
+        phase: data
+    body:
+      nodes:
+        - id: h
+          process: halve
+          bind:
+            x:
+              from: inputs.x
+      returns:
+        y:
+          from: h.y
+entry: main
