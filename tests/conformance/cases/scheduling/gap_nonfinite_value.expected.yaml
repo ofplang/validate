@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: malformed_prefer_payload
+    path: "processes.main.scheduling.policies[0].prefer"
+notes: >-
+  A preference value must be a finite numeric scalar; NaN and infinity are not
+  valid portable v0 values (spec 23.4). "at most infinite minutes" is also just
+  the absence of a policy.

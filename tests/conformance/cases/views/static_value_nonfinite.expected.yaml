@@ -1,0 +1,11 @@
+outcome: invalid
+errors:
+  - code: static_value_type_mismatch
+    path: "types.Reading.view.upper.value"
+  - code: static_value_type_mismatch
+    path: "types.Reading.view.missing.value"
+notes: >-
+  A Float static view value must be a finite numeric scalar; NaN and infinity
+  are not valid portable v0 static values (spec 7.4, summary rule 57). The
+  restriction is on the type-level constant only -- v0 does not constrain the
+  Float values a runner routes at run time.

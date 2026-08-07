@@ -38,7 +38,13 @@ def _static_value_conforms(expr: TypeExpr, value: YNode) -> bool:
     """Recursively check a static value against a primitive-only view type.
 
     Float intentionally accepts an integer scalar as well (spec 7.4: YAML
-    integer/float/exponent numeric forms are all acceptable Float values).
+    integer/float/exponent numeric forms are all acceptable Float values), but
+    requires the value to be *finite* -- NaN and infinity are not portable v0
+    static values (spec 7.4, summary rule 57).
+
+    The restriction is on the type-level static value only. It says nothing
+    about the Float values that flow at run time, which v0 does not constrain
+    here; a runner is free to route a non-finite one.
     """
     if isinstance(expr, ArrayT):
         if not isinstance(value, YSeq):
@@ -52,7 +58,7 @@ def _static_value_conforms(expr: TypeExpr, value: YNode) -> bool:
     if name == "Int":
         return value.is_int
     if name == "Float":
-        return value.is_float or value.is_int
+        return (value.is_float or value.is_int) and value.is_finite
     if name == "String":
         return value.is_str
     return False

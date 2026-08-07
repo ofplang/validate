@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  The non-negative rule belongs to max_gap / min_gap alone (spec 23.4.1,
+  23.4.2). temperature requires only a finite value (spec 23.4.3), so -80 C is
+  an ordinary storage preference. Pins that the gap check does not leak here.

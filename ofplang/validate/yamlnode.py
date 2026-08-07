@@ -23,6 +23,7 @@ decouple the rest of the validator from PyYAML's internal node API.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -87,6 +88,34 @@ class YScalar(YNode):
     @property
     def is_str(self) -> bool:
         return self.tag == TAG_STR
+
+    @property
+    def is_finite(self) -> bool:
+        """Whether this is a numeric scalar whose value is finite.
+
+        v0 excludes NaN and infinity everywhere a number is written: a static
+        view value must be a finite numeric scalar (spec 7.4) and so must a
+        scheduling preference value (spec 23.4). The exclusion lives here rather
+        than at each call site because the two ways to write a non-finite float
+        are easy to miss individually: YAML spells them ``.inf`` / ``-.inf`` /
+        ``.nan`` (any capitalisation), and a decimal that overflows the double
+        range -- ``1.0e999`` -- resolves to infinity as well.
+
+        An integer scalar is always finite; a non-numeric scalar is not a number
+        at all and answers ``False``.
+        """
+        if self.is_int:
+            return True
+        if not self.is_float:
+            return False
+        if self.text.strip().lstrip("+-").lower() in (".inf", ".nan"):
+            return False
+        try:
+            return math.isfinite(float(self.text))
+        except ValueError:
+            # A YAML 1.1 float spelling Python's `float()` does not accept (a
+            # sexagesimal such as `190:20:30.15`). Those forms are all finite.
+            return True
 
 
 @dataclass

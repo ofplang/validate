@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: malformed_prefer_payload
+    path: "processes.main.scheduling.policies[0].prefer"
+notes: >-
+  max_gap requires a non-negative value (spec 23.4.1; min_gap likewise, 23.4.2).
+  "at most -5 minutes" is a preference no schedule can satisfy.

@@ -1,0 +1,18 @@
+spec_version: "0.0"
+types:
+  Reading:
+    domain: data
+    view:
+      upper:
+        type: Float
+        value: .inf
+      missing:
+        type: Float
+        value: .nan
+processes:
+  main:
+    kind: composite
+    body:
+      nodes: []
+      returns: {}
+entry: main

@@ -35,15 +35,39 @@ def _valid_temporal(text: str, node_ids: set[str]) -> bool:
     return parts[0] == "self" or parts[0] in node_ids
 
 
-def _payload_ok(prefer: YMap) -> bool:
-    """v0 gap/temperature payloads need a numeric `value` and a non-empty string
-    `unit` (spec 23.4). We check presence and scalar shape only; unit semantics
-    are implementation-defined."""
+def _is_negative(value: YScalar) -> bool:
+    """Whether a numeric scalar is strictly negative (`-0` is not)."""
+    try:
+        return float(value.text) < 0.0
+    except ValueError:
+        # A YAML numeric spelling `float()` does not accept (a hex/octal integer,
+        # a sexagesimal). A leading `-` is the only way to write a negative one.
+        return value.text.strip().startswith("-")
+
+
+def _payload_reason(prefer: YMap, kind: str) -> str | None:
+    """Why this preference payload is not a valid v0 one, or None if it is.
+
+    v0 constrains the payload of every defined preference kind (spec 23.4): a
+    numeric, *finite* `value` and a `unit` that is a string with at least one
+    non-whitespace character. `max_gap` and `min_gap` additionally require a
+    non-negative value (spec 23.4.1, 23.4.2) -- a gap of "at most -5 minutes" is
+    a preference nothing can satisfy. `temperature` carries no sign restriction
+    (spec 23.4.3): -80 C is an ordinary storage preference.
+
+    Unit *semantics* stay implementation-defined; only the scalar shape is v0's.
+    """
     value = prefer.get("value")
     if not (isinstance(value, YScalar) and (value.is_int or value.is_float)):
-        return False
+        return "requires a numeric value"
+    if not value.is_finite:
+        return "value must be finite (NaN and infinity are not portable v0)"
+    if kind in _GAP_KINDS and _is_negative(value):
+        return "value must be non-negative"
     unit = prefer.get("unit")
-    return isinstance(unit, YScalar) and unit.is_str and bool(unit.text.strip())
+    if not (isinstance(unit, YScalar) and unit.is_str and bool(unit.text.strip())):
+        return "requires a non-empty unit string"
+    return None
 
 
 def _object_bearing_target(ref_text: str, comp_sig: ProcSig, nodes_by_id, sigs) -> bool | None:
@@ -108,11 +132,11 @@ def _check_policy(
             at=policy,
         )
 
-    # Preference payload shape (value + unit) for v0 kinds (spec 23.4).
-    if isinstance(prefer, YMap) and not _payload_ok(prefer):
+    # Preference payload shape and numeric constraints for v0 kinds (spec 23.4).
+    if isinstance(prefer, YMap) and (reason := _payload_reason(prefer, kind)) is not None:
         diags.add(
             errors.MALFORMED_PREFER_PAYLOAD,
-            f"{kind} payload requires numeric value and unit",
+            f"{kind} payload {reason}",
             f"{base}.prefer",
             at=prefer,
         )

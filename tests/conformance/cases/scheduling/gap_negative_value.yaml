@@ -1,0 +1,27 @@
+spec_version: "0.0"
+features:
+  - scheduling_policies
+processes:
+  collect:
+    kind: atomic
+  analyze:
+    kind: atomic
+  main:
+    kind: composite
+    body:
+      nodes:
+        - id: c
+          process: collect
+        - id: a
+          process: analyze
+      returns: {}
+    scheduling:
+      policies:
+        - during:
+            from: c.end
+            to: a.start
+          prefer:
+            kind: max_gap
+            value: -5
+            unit: min
+entry: main

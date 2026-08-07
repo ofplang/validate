@@ -1,0 +1,52 @@
+spec_version: "0.0"
+features:
+  - scheduling_policies
+types:
+  Sample:
+    domain: object
+processes:
+  freeze:
+    kind: atomic
+    inputs:
+      sample:
+        type: Sample
+        phase: data
+    outputs:
+      sample:
+        type: Sample
+        phase: data
+    objects:
+      map:
+        outputs.sample: inputs.sample
+  main:
+    kind: composite
+    inputs:
+      sample:
+        type: Sample
+        phase: data
+    outputs:
+      sample:
+        type: Sample
+        phase: data
+    body:
+      nodes:
+        - id: f
+          process: freeze
+          state:
+            sample:
+              from: inputs.sample
+      returns:
+        sample:
+          from: f.sample
+    scheduling:
+      policies:
+        - object:
+            from: inputs.sample
+          during:
+            from: self.start
+            to: self.end
+          prefer:
+            kind: temperature
+            value: -80
+            unit: C
+entry: main
