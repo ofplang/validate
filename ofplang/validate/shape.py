@@ -70,12 +70,18 @@ _NODE_SECTION_KEYS = {
 
 # Allowed sections per node kind. An ordinary (unkinded) node uses `state` for
 # Object-bearing linear inputs and `bind` for Pure Data inputs (spec 11); it has
-# no output-control section. Structured nodes add their control sections and the
-# `outputs` shaping section (spec 21). `bind` (Pure Data, unrestricted, spec 11)
-# is allowed wherever a target process is invoked with per-port inputs.
+# no output-control section. `fold`, `do_while` and `branch` add their control
+# sections and the `outputs` shaping section (spec 21). `bind` (Pure Data,
+# unrestricted, spec 11) is allowed wherever a target process is invoked with
+# per-port inputs.
+#
+# `map` deliberately has no `outputs`: its output shape is fixed -- every target
+# output p: T is exposed as Array<T> -- so v0 defines no `map.outputs` to shape
+# it with (spec 17, 21, summary rule 32). Writing one is a section-not-valid-for
+# -kind error rather than a silently ignored section.
 _NODE_ALLOWED = {
     "ordinary": {"id", "process", "state", "bind"},
-    "map": {"id", "kind", "process", "each", "bind", "outputs"},
+    "map": {"id", "kind", "process", "each", "bind"},
     "fold": {"id", "kind", "process", "each", "carry", "bind", "outputs"},
     "do_while": {
         "id", "kind", "process", "carry", "bind", "condition", "max_iterations", "outputs"

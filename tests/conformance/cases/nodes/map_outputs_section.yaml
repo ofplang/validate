@@ -1,0 +1,39 @@
+spec_version: "0.0"
+features:
+  - node_map
+processes:
+  double:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      m:
+        type: Int
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
+    outputs:
+      ms:
+        type: Array<Int>
+        phase: data
+    body:
+      nodes:
+        - id: mp
+          kind: map
+          process: double
+          each:
+            n:
+              from: inputs.ns
+          outputs:
+            m:
+              mode: collect
+      returns:
+        ms:
+          from: mp.m
+entry: main

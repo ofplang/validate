@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: section_not_valid_for_kind
+    path: "processes.main.body.nodes[0].outputs"
+notes: >-
+  A map node's output shape is fixed (each target output p: T is exposed as
+  Array<T>), so v0 defines no `map.outputs` to shape it with (spec 17, 21,
+  summary rule 32). Writing one is a section-not-valid-for-kind error, not a
+  silently ignored section -- `mode: collect` here is already what a map does.
