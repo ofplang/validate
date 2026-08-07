@@ -160,9 +160,16 @@ UNKNOWN_ENTRY_PROCESS = "unknown_entry_process"
 RECURSIVE_PROCESS_DEPENDENCY = "recursive_process_dependency"
 
 # --- References (spec 2.6) ------------------------------------------------
+# Spec 2.6 separates three reference failures: a malformed one, one whose target
+# does not exist, and one "not valid in its syntactic context" (an invalid
+# reference scope). The first two have codes below; the third has none, because
+# at v0's reference grammar there is nothing left for it to name. A body
+# dataflow reference is `inputs.<port>` or `<node>.<output>`, so a
+# wrongly-scoped one such as `outputs.a` still parses as `<node>.<output>` and
+# is reported by its real defect -- no node named `outputs` -- as an unknown
+# reference. Anything that does not parse at all is malformed_reference.
 MALFORMED_REFERENCE = "malformed_reference"
 UNKNOWN_REFERENCE = "unknown_reference"
-INVALID_REFERENCE_SCOPE = "invalid_reference_scope"
 BINDING_SOURCE_ARITY = "binding_source_arity"
 
 
