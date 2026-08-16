@@ -184,6 +184,18 @@ LITERAL_TYPE_MISMATCH = "literal_type_mismatch"
 # `literal_type_mismatch`: the literal is not the wrong *type*, it is the wrong
 # *kind of thing* for that port, and no literal would be right.
 LITERAL_ON_OBJECT_PORT = "literal_on_object_port"
+# An `each` source is traversed element-wise, so it must be an Array (spec 11.1,
+# 17, 18). Separate from `binding_type_mismatch`, which is what an Array of the
+# wrong element type gets: this one is not the wrong element type, it is not a
+# collection at all, so there is nothing to traverse.
+EACH_SOURCE_NOT_ARRAY = "each_source_not_array"
+# A branch argument must correspond to a same-name, same-type input port of each
+# arm (spec 20 requirement 2) -- so this fires both when the bound value is wrong
+# and when the two arms disagree about the port it feeds.
+ARG_TYPE_MISMATCH = "arg_type_mismatch"
+# `branch.condition.from` must be a Boolean Data value (spec 20). Distinct from
+# `bad_condition_output`, which is do_while's condition naming a target output.
+BAD_CONDITION_TYPE = "bad_condition_type"
 
 
 def _collect_codes() -> frozenset[str]:

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.loop.carry.acc"
+notes: "The initial carry value must match the carried port. spec 16 relates the target's own input and output; this is the value bound into it (spec 11.1)."

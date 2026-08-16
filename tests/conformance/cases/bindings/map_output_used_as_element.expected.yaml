@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.sum.bind.n"
+notes: "A map output p: T is exposed as Array<T> (spec 17, 21), so binding it to an Int port does not match (spec 11.1)."

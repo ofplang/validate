@@ -1,0 +1,30 @@
+spec_version: "0.0"
+features: [node_branch]
+processes:
+  shout:
+    kind: atomic
+    inputs:
+      text: { type: String, phase: data }
+    outputs: {}
+  whisper:
+    kind: atomic
+    inputs:
+      text: { type: String, phase: data }
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      text: { type: String, phase: data }
+      level: { type: Int, phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: say
+          kind: branch
+          condition: { from: inputs.level }
+          args:
+            text: { from: inputs.text }
+          then: { process: shout }
+          else: { process: whisper }
+      returns: {}
+entry: main

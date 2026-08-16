@@ -14,17 +14,24 @@ They cover:
   * **phase-flow** — a value may only flow into an equal-or-later phase
     (spec 6): data -> run/graph and run -> graph are errors; and
   * **binding type compatibility** — a bound value's resolved type must match the
-    port it is bound to (spec 11.1), including a written-out literal (spec 11.1.1)
-    and the sources of `body.returns`.
+    port it is bound to (spec 11.1), in every binding section, in `body.returns`,
+    and for a written-out literal (spec 11.1.1).
 
 Structured nodes (map/fold/do_while/branch) reshape/route values in kind-specific
-ways, so per-port indegree, phase-flow, and type matching are checked only for
-ordinary nodes; reference resolution still applies to all node bindings.
+ways, so per-port indegree and phase-flow are checked only for ordinary nodes;
+reference resolution and type matching apply to all node bindings.
 
-Type matching is skipped wherever a type parameter would have to be *inferred*
-rather than compared: a binding to a generic process, or a value produced by one.
-Those are instantiation, which spec 8.1 gives to the generics pass. A type parameter
-of the *enclosing* composite is not skipped -- it is rigid there (spec 8.1), so it
+Type matching accounts for that reshaping on both sides. An `each` source is
+traversed element-wise, so what must match the target port is its element type
+(spec 11.1, 17, 18); a structured node's *output* is shaped by its mode, so a `map`
+output is an Array and a dropped one is not a value at all (spec 21, via
+`matching.source_type`). A branch has no single target: its arguments are matched
+against every arm (spec 20), and its condition must be Boolean Data.
+
+Matching is skipped wherever a type parameter would have to be *inferred* rather
+than compared: a binding to a generic process, or a value produced by one. Those
+are instantiation, which spec 8.1 gives to the generics pass. A type parameter of
+the *enclosing* composite is not skipped -- it is rigid there (spec 8.1), so it
 compares by name like any other atom.
 """
 
@@ -36,6 +43,7 @@ from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.matching import (
     MatchResult,
+    arm_sig,
     is_primitive_only,
     literal_conforms,
     match,
@@ -45,6 +53,7 @@ from ofplang.validate.matching import (
 from ofplang.validate.objects import ProcSig
 from ofplang.validate.types import (
     ArrayT,
+    Atom,
     TypeEnv,
     TypeExpr,
     is_object_bearing,
@@ -154,6 +163,7 @@ def _check_binding_type(
     env: TypeEnv,
     rigid: dict[str, str],
     resolve: Callable[[str], TypeExpr | None],
+    array_code: str | None = None,
 ) -> None:
     """Match one source entry's value against the port type `want` (spec 11.1).
 
@@ -161,6 +171,11 @@ def _check_binding_type(
     declared type (spec 11.1.1), a `from` reference against the type it denotes.
     `resolve` maps a reference's text to its type, or None when this layer cannot
     say -- see the module docstring for what is deliberately left unmatched.
+
+    `array_code` is reported in place of `code` when `want` is an Array and the
+    source is not one at all. That is the `each` case: "this is not a collection" is
+    a different mistake from "this collection holds the wrong thing", and only the
+    caller knows whether the Array came from the port or from element-wise traversal.
     """
     if not _usable(want, env, rigid):
         return
@@ -197,12 +212,68 @@ def _check_binding_type(
         return
     assert got is not None  # _usable
     if match(want, got, env=env, flexible={}, rigid=rigid) is not MatchResult.OK:
+        if array_code is not None and isinstance(want, ArrayT) and not isinstance(got, ArrayT):
+            diags.add(
+                array_code,
+                f"an each source must be an Array; {_show(got)} cannot be traversed",
+                path,
+                at=frm,
+            )
+            return
         diags.add(
             code,
             f"value of type {_show(got)} bound to a port of type {_show(want)}",
             path,
             at=frm,
         )
+
+
+def _check_branch_args(
+    diags: Diagnostics,
+    node: YMap,
+    nid: str,
+    sigs: dict[str, ProcSig],
+    base: str,
+    *,
+    env: TypeEnv,
+    rigid: dict[str, str],
+    resolve: Callable[[str], TypeExpr | None],
+) -> None:
+    """Match each branch argument against the same-named input port of every arm
+    (spec 20 requirement 2, spec 11.1).
+
+    A branch has no single target -- the argument is supplied to whichever arm runs
+    -- so it must fit both. Checking each arm in turn and stopping at the first
+    mismatch reports one diagnostic per argument whether the *value* is wrong or the
+    two *arms* disagree about the port it feeds; either way the author has one thing
+    to look at. An arm that declares no such port at all is left alone here: that is
+    a missing port, not a type mismatch, and nothing reports it yet.
+    """
+    args = node.get("args")
+    if not isinstance(args, YMap):
+        return
+    for portname in args.keys():
+        entry = args.get(portname)
+        if not isinstance(entry, YMap):
+            continue
+        for arm in ("then", "else"):
+            sig = arm_sig(node, arm, sigs)
+            port = sig.inputs.get(portname) if sig is not None and not sig.generic else None
+            if port is None:
+                continue
+            before = len(diags.items)
+            _check_binding_type(
+                diags,
+                entry,
+                port.type_expr,
+                f"{base}.nodes.{nid}.args.{portname}",
+                errors.ARG_TYPE_MISMATCH,
+                env=env,
+                rigid=rigid,
+                resolve=resolve,
+            )
+            if len(diags.items) > before:
+                break  # this argument is reported once, not once per arm
 
 
 def _check_composite(
@@ -316,25 +387,29 @@ def _check_composite(
                 epath = f"{base}.nodes.{nid}.{section}.{portname}"
                 _check_source_entry(entry, epath, tgt_phase)
 
-                # Binding type compatibility (spec 11.1), ordinary nodes only: a
-                # structured node reshapes what it binds (an `each` source is
-                # traversed element-wise, spec 17/18), which this layer does not
-                # model yet. A generic target's ports are matched by *inferring* its
-                # parameters, which is the generics pass's job (spec 8.1), so it is
-                # left alone here -- reporting per port would also double up on the
-                # inference diagnostics that pass already emits.
-                if kind is None and target is not None and not target.generic:
+                # Binding type compatibility (spec 11.1). A generic target's ports
+                # are matched by *inferring* its parameters, which is the generics
+                # pass's job (spec 8.1), so it is left alone here -- reporting per
+                # port would also double up on the inference diagnostics that pass
+                # already emits. `args` is handled after this loop: it is matched
+                # against each arm, not against one target.
+                if target is not None and not target.generic and section != "args":
                     port = target.inputs.get(portname)
-                    if port is not None:
+                    if port is not None and port.type_expr is not None:
+                        # An `each` source is traversed element-wise (spec 11.1, 17,
+                        # 18), so what must match the port is the source's *element*
+                        # type -- i.e. the source itself must be Array<port type>.
+                        elementwise = section == "each"
                         _check_binding_type(
                             diags,
                             entry,
-                            port.type_expr,
+                            ArrayT(port.type_expr) if elementwise else port.type_expr,
                             epath,
                             errors.BINDING_TYPE_MISMATCH,
                             env=env,
                             rigid=rigid,
                             resolve=_resolve_type,
+                            array_code=errors.EACH_SOURCE_NOT_ARRAY if elementwise else None,
                         )
 
                 # `bind` is Pure Data only: an Object-bearing value must be
@@ -378,6 +453,20 @@ def _check_composite(
                             f"{base}.nodes.{nid}.condition",
                             at=frm,
                         )
+                    else:
+                        # The condition selects an arm, so it must be a Boolean Data
+                        # value (spec 20).
+                        got = _resolve_type(frm.text)
+                        if got is not None and got != Atom("Bool"):
+                            diags.add(
+                                errors.BAD_CONDITION_TYPE,
+                                f"branch condition is {_show(got)}, not Bool",
+                                f"{base}.nodes.{nid}.condition",
+                                at=frm,
+                            )
+            _check_branch_args(
+                diags, node, nid, sigs, base, env=env, rigid=rigid, resolve=_resolve_type
+            )
 
         # Node input indegree, ordinary nodes only: every target input port must
         # be bound exactly once via state (Object) or bind (Pure Data).

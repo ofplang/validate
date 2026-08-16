@@ -1,0 +1,23 @@
+spec_version: "0.0"
+features: [node_map]
+processes:
+  double:
+    kind: atomic
+    inputs:
+      n: { type: Int, phase: data }
+    outputs:
+      m: { type: Int, phase: data }
+  main:
+    kind: composite
+    inputs:
+      names: { type: "Array<String>", phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: each_one
+          kind: map
+          process: double
+          each:
+            n: { from: inputs.names }
+      returns: {}
+entry: main

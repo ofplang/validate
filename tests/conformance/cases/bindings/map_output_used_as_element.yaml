@@ -1,0 +1,34 @@
+# Pins the spec 21 output shaping from the failing side: a `map` collects its
+# target's output p: T into Array<T>, so consuming it as a bare T is a mismatch.
+spec_version: "0.0"
+features: [node_map]
+processes:
+  double:
+    kind: atomic
+    inputs:
+      n: { type: Int, phase: data }
+    outputs:
+      m: { type: Int, phase: data }
+  total:
+    kind: atomic
+    inputs:
+      n: { type: Int, phase: data }
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      ns: { type: "Array<Int>", phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: each_one
+          kind: map
+          process: double
+          each:
+            n: { from: inputs.ns }
+        - id: sum
+          process: total
+          bind:
+            n: { from: each_one.m }
+      returns: {}
+entry: main

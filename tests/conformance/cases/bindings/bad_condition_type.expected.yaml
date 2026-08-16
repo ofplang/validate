@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: bad_condition_type
+    path: "processes.main.body.nodes.say.condition"
+notes: "A branch selects an arm on a Boolean Data condition (spec 20); an Int cannot select one."

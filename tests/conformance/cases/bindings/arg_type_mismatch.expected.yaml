@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: arg_type_mismatch
+    path: "processes.main.body.nodes.say.args.text"
+notes: "A branch argument must correspond to a same-name, same-type input port of each arm (spec 20 requirement 2, 11.1)."

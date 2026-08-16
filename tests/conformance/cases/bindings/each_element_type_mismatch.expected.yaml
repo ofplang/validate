@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.each_one.each.n"
+notes: "The each source is an Array, but of the wrong element type: Array<String> traversed into an Int port (spec 11.1)."

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: each_source_not_array
+    path: "processes.main.body.nodes.each_one.each.n"
+notes: "An each source is traversed element-wise, so it must be an Array; a bare Int cannot be traversed (spec 11.1, 17)."

@@ -1,0 +1,2 @@
+outcome: valid
+notes: "Baseline for the structured binding surfaces and the spec 21 output shaping: map -> Array<T>, fold collect -> Array<T>, carry, each, branch args and condition."

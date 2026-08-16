@@ -1,0 +1,77 @@
+# Every structured binding surface, all matching, and the spec 21 output shaping
+# consumed downstream: a map output read as Array<T>, a fold collect read as
+# Array<T>, a branch argument and its Boolean condition.
+spec_version: "0.0"
+features: [node_map, node_fold, node_branch]
+processes:
+  double:
+    kind: atomic
+    inputs:
+      n: { type: Int, phase: data }
+    outputs:
+      m: { type: Int, phase: data }
+  measure:
+    kind: atomic
+    inputs:
+      acc: { type: Float, phase: data }
+      item: { type: Int, phase: data }
+    outputs:
+      acc: { type: Float, phase: data }
+      reading: { type: Float, phase: data }
+  report:
+    kind: atomic
+    inputs:
+      doubled: { type: "Array<Int>", phase: data }
+      readings: { type: "Array<Float>", phase: data }
+    outputs:
+      ok: { type: Bool, phase: data }
+  shout:
+    kind: atomic
+    inputs:
+      flag: { type: Bool, phase: data }
+    outputs: {}
+  whisper:
+    kind: atomic
+    inputs:
+      flag: { type: Bool, phase: data }
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      ns: { type: "Array<Int>", phase: data }
+      init: { type: Float, phase: data }
+      loud: { type: Bool, phase: data }
+    outputs:
+      readings: { type: "Array<Float>", phase: data }
+    body:
+      nodes:
+        - id: each_one
+          kind: map
+          process: double
+          each:
+            n: { from: inputs.ns }
+        - id: loop
+          kind: fold
+          process: measure
+          carry:
+            acc: { from: inputs.init }
+          each:
+            item: { from: each_one.m }
+          outputs:
+            acc: { mode: carry }
+            reading: { mode: collect }
+        - id: say
+          kind: branch
+          condition: { from: inputs.loud }
+          args:
+            flag: { from: inputs.loud }
+          then: { process: shout }
+          else: { process: whisper }
+        - id: rep
+          process: report
+          bind:
+            doubled: { from: each_one.m }
+            readings: { from: loop.reading }
+      returns:
+        readings: { from: loop.reading }
+entry: main

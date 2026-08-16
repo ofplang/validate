@@ -151,6 +151,82 @@ def satisfies(
 # --- resolving what a reference denotes -------------------------------------
 
 
+def _text_of(node: YNode | None) -> str | None:
+    return node.text if isinstance(node, YScalar) else None
+
+
+def _mode_of(entry: YNode | None) -> str | None:
+    """The `mode` of one entry in a structured node's `outputs` section (spec 21)."""
+    return _text_of(entry.get("mode")) if isinstance(entry, YMap) else None
+
+
+def arm_sig(node: YMap, arm: str, sigs: dict[str, ProcSig]) -> ProcSig | None:
+    """The signature of a branch arm's process (spec 20)."""
+    arm_node = node.get(arm)
+    proc = _text_of(arm_node.get("process")) if isinstance(arm_node, YMap) else None
+    return sigs.get(proc) if proc is not None else None
+
+
+def structured_output_type(
+    node: YMap, name: str, sigs: dict[str, ProcSig]
+) -> TypeExpr | None:
+    """The type a structured node exposes for output `name` (spec 21), or None when
+    the output is not exposed at all or cannot be typed here.
+
+    A structured node reshapes its target's outputs, so what a downstream binding sees
+    is not the target's declared type: `map` collects every output into an Array, and
+    `fold` / `do_while` shape each one by its mode. `drop` -- and a non-carry output
+    under an omitted `outputs` section, which is dropped by default (spec 18.3, 19.2)
+    -- expose nothing, so there is no type to match against.
+    """
+    kind = _text_of(node.get("kind"))
+
+    if kind == "branch":
+        # A branch exposes an output common to both arms, with the same type in each
+        # (spec 20.1 rule 4, pinned by the node pass), so either arm's declaration
+        # types it. With `outputs` omitted only Object-bearing commons are exposed
+        # and Data outputs are dropped (spec 20.3).
+        then_sig = arm_sig(node, "then", sigs)
+        port = then_sig.outputs.get(name) if then_sig is not None else None
+        if port is None:
+            return None
+        outputs = node.get("outputs")
+        if isinstance(outputs, YMap):
+            return port.type_expr if _mode_of(outputs.get(name)) == "common" else None
+        return port.type_expr if port.object_bearing else None
+
+    proc = _text_of(node.get("process"))
+    target = sigs.get(proc) if proc is not None else None
+    port = target.outputs.get(name) if target is not None else None
+    if port is None or port.type_expr is None:
+        return None
+
+    if kind == "map":
+        # Every target output p: T is collected as Array<T>; v0 defines no
+        # `map.outputs` to shape it with (spec 17, 21).
+        return ArrayT(port.type_expr)
+
+    if kind not in ("fold", "do_while"):
+        return None
+
+    outputs = node.get("outputs")
+    if isinstance(outputs, YMap):
+        mode = _mode_of(outputs.get(name))
+    else:
+        # Defaults: carry outputs are exposed as carry, everything else is dropped
+        # (spec 18.3, 19.2).
+        carry = node.get("carry")
+        mode = "carry" if isinstance(carry, YMap) and name in carry.keys() else None
+
+    if mode == "collect":
+        return ArrayT(port.type_expr)
+    if mode in ("carry", "last"):
+        # A carry output is the threaded value itself, which spec 16 requires to be
+        # the same type as the carried port; `last` is one per-invocation value.
+        return port.type_expr
+    return None  # drop, unlisted, or an unrecognised mode: nothing is exposed
+
+
 def source_type(
     ref: str,
     comp_sig: ProcSig,
@@ -161,9 +237,10 @@ def source_type(
     determined from the declarations alone.
 
     `inputs.X` is an input port of the enclosing composite; `<node>.<out>` is an output
-    of a direct child. None means "no answer here", never "no type": a structured node
-    reshapes its target's outputs (spec 21) and that shaping is not modelled yet, and a
-    malformed or dangling reference is reported by the reference checks instead.
+    of a direct child, reshaped by that child if it is a structured node (spec 21).
+    None means "no answer here", never "no type": the output may not be exposed at
+    all, and a malformed or dangling reference is reported by the reference checks
+    instead.
     """
     parts = ref.split(".")
     if len(parts) != 2:
@@ -176,7 +253,7 @@ def source_type(
     if not isinstance(node, YMap):
         return None
     if node.get("kind") is not None:
-        return None  # structured node output shaping (spec 21) is not modelled yet
+        return structured_output_type(node, name, sigs)
     proc = node.get("process")
     if not isinstance(proc, YScalar) or proc.text not in sigs:
         return None
@@ -197,10 +274,14 @@ def producer_is_generic(ref: str, sigs: dict[str, ProcSig], nodes_by_id: dict[st
     node = nodes_by_id.get(parts[0])
     if not isinstance(node, YMap):
         return False
-    proc = node.get("process")
-    if not isinstance(proc, YScalar):
-        return False
-    target = sigs.get(proc.text)
+    if _text_of(node.get("kind")) == "branch":
+        # A branch names no single target; either arm could be the generic one.
+        return any(
+            (sig := arm_sig(node, arm, sigs)) is not None and sig.generic
+            for arm in ("then", "else")
+        )
+    proc = _text_of(node.get("process"))
+    target = sigs.get(proc) if proc is not None else None
     return target is not None and target.generic
 
 
