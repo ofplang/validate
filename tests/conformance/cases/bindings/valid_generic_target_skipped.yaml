@@ -1,0 +1,39 @@
+# A binding to a *generic* process is matched by inferring that process's type
+# parameters (spec 8.1), which the generics pass owns; the binding-type check leaves
+# it alone rather than comparing the parameter name. This document is valid, and is
+# here to pin that it stays valid.
+spec_version: "0.0"
+features: [generic_processes]
+traits:
+  Washable: {}
+types:
+  Cup:
+    domain: object
+    implements:
+      - Washable
+processes:
+  wash:
+    kind: atomic
+    type_params:
+      O: { domain: object }
+    where:
+      - "Washable<O>"
+    inputs:
+      item: { type: O, phase: data }
+    outputs:
+      item: { type: O, phase: data }
+    objects:
+      map:
+        outputs.item: inputs.item
+  main:
+    kind: composite
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    body:
+      nodes:
+        - { id: w, process: wash, state: { item: { from: inputs.cup } } }
+      returns:
+        cup: { from: w.item }
+entry: main

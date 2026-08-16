@@ -12,18 +12,45 @@ They cover:
     exactly once (spec 12.1/12.2), distinguishing Pure Data (`data_indegree`)
     from Object (`object_input_no_source`); and
   * **phase-flow** — a value may only flow into an equal-or-later phase
-    (spec 6): data -> run/graph and run -> graph are errors.
+    (spec 6): data -> run/graph and run -> graph are errors; and
+  * **binding type compatibility** — a bound value's resolved type must match the
+    port it is bound to (spec 11.1), including a written-out literal (spec 11.1.1)
+    and the sources of `body.returns`.
 
 Structured nodes (map/fold/do_while/branch) reshape/route values in kind-specific
-ways, so per-port indegree and phase-flow are checked only for ordinary nodes;
-reference resolution still applies to all node bindings.
+ways, so per-port indegree, phase-flow, and type matching are checked only for
+ordinary nodes; reference resolution still applies to all node bindings.
+
+Type matching is skipped wherever a type parameter would have to be *inferred*
+rather than compared: a binding to a generic process, or a value produced by one.
+Those are instantiation, which spec 8.1 gives to the generics pass. A type parameter
+of the *enclosing* composite is not skipped -- it is rigid there (spec 8.1), so it
+compares by name like any other atom.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.matching import (
+    MatchResult,
+    is_primitive_only,
+    literal_conforms,
+    match,
+    producer_is_generic,
+    source_type,
+)
 from ofplang.validate.objects import ProcSig
+from ofplang.validate.types import (
+    ArrayT,
+    TypeEnv,
+    TypeExpr,
+    is_object_bearing,
+    process_type_params,
+    resolve_error,
+)
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
 # Phase order graph < run < data (spec 6). Rank lets us compare "earlier".
@@ -104,13 +131,96 @@ def _source_object_bearing(ref: tuple[str, str], sig: ProcSig, nodes_by_id, sigs
     return False
 
 
+def _show(expr: TypeExpr) -> str:
+    """A type expression back in v0 source form, for a diagnostic message."""
+    return f"Array<{_show(expr.elem)}>" if isinstance(expr, ArrayT) else expr.name
+
+
+def _usable(expr: TypeExpr | None, env: TypeEnv, params: dict[str, str]) -> bool:
+    """Whether a type can be matched against: present, and resolving to real names.
+
+    An absent or unresolvable type was already reported by the type pass, and
+    comparing it would only add a second, less useful diagnostic for one mistake."""
+    return expr is not None and resolve_error(expr, env, params) is None
+
+
+def _check_binding_type(
+    diags: Diagnostics,
+    entry: YMap,
+    want: TypeExpr | None,
+    path: str,
+    code: str,
+    *,
+    env: TypeEnv,
+    rigid: dict[str, str],
+    resolve: Callable[[str], TypeExpr | None],
+) -> None:
+    """Match one source entry's value against the port type `want` (spec 11.1).
+
+    Handles both forms of source entry: a `value` literal is checked against the
+    declared type (spec 11.1.1), a `from` reference against the type it denotes.
+    `resolve` maps a reference's text to its type, or None when this layer cannot
+    say -- see the module docstring for what is deliberately left unmatched.
+    """
+    if not _usable(want, env, rigid):
+        return
+    assert want is not None  # _usable
+
+    value = entry.get("value")
+    if value is not None:
+        # A literal is Pure Data and cannot introduce an Object identity (spec 13),
+        # so no literal is right for an Object-bearing port -- a different failure
+        # from writing the wrong one, hence its own code.
+        if is_object_bearing(want, env, rigid):
+            diags.add(
+                errors.LITERAL_ON_OBJECT_PORT,
+                f"a literal cannot be bound to the Object-bearing port type {_show(want)}",
+                path,
+                at=value,
+            )
+        # Otherwise: only a primitive-only port type has a decidable YAML shape
+        # (spec 11.1.1); a nominal Data port's literal is left unchecked.
+        elif is_primitive_only(want) and not literal_conforms(want, value):
+            diags.add(
+                errors.LITERAL_TYPE_MISMATCH,
+                f"literal does not conform to the port type {_show(want)}",
+                path,
+                at=value,
+            )
+        return
+
+    frm = entry.get("from")
+    if not isinstance(frm, YScalar):
+        return
+    got = resolve(frm.text)
+    if not _usable(got, env, rigid):
+        return
+    assert got is not None  # _usable
+    if match(want, got, env=env, flexible={}, rigid=rigid) is not MatchResult.OK:
+        diags.add(
+            code,
+            f"value of type {_show(got)} bound to a port of type {_show(want)}",
+            path,
+            at=frm,
+        )
+
+
 def _check_composite(
-    diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig, sigs: dict[str, ProcSig]
+    diags: Diagnostics,
+    pname: str,
+    proc: YMap,
+    sig: ProcSig,
+    sigs: dict[str, ProcSig],
+    env: TypeEnv,
 ) -> None:
     body = proc.get("body")
     if not isinstance(body, YMap):
         return
     base = f"processes.{pname}.body"
+    # This composite's own type parameters are *rigid* inside its body (spec 8.1):
+    # they stand for types already fixed by whoever instantiates it, so they compare
+    # by name rather than being inferred.
+    rigid = process_type_params(proc)
 
     nodes = body.get("nodes")
     node_items = [
@@ -133,6 +243,14 @@ def _check_composite(
         if owner == "inputs":
             return name in input_names
         return (owner, name) in node_out
+
+    def _resolve_type(text: str) -> TypeExpr | None:
+        """The type a reference denotes, or None where matching must stand down: a
+        value produced by a generic process names that process's own parameter, which
+        means nothing until the invocation is instantiated (spec 8.1)."""
+        if producer_is_generic(text, sigs, nodes_by_id):
+            return None
+        return source_type(text, sig, sigs, nodes_by_id)
 
     def _check_source_entry(entry: YMap, path: str, target_input_phase: str | None) -> None:
         """Arity + reference resolution + phase-flow for one source entry."""
@@ -197,6 +315,27 @@ def _check_composite(
                     tgt_phase = target.inputs[portname].phase
                 epath = f"{base}.nodes.{nid}.{section}.{portname}"
                 _check_source_entry(entry, epath, tgt_phase)
+
+                # Binding type compatibility (spec 11.1), ordinary nodes only: a
+                # structured node reshapes what it binds (an `each` source is
+                # traversed element-wise, spec 17/18), which this layer does not
+                # model yet. A generic target's ports are matched by *inferring* its
+                # parameters, which is the generics pass's job (spec 8.1), so it is
+                # left alone here -- reporting per port would also double up on the
+                # inference diagnostics that pass already emits.
+                if kind is None and target is not None and not target.generic:
+                    port = target.inputs.get(portname)
+                    if port is not None:
+                        _check_binding_type(
+                            diags,
+                            entry,
+                            port.type_expr,
+                            epath,
+                            errors.BINDING_TYPE_MISMATCH,
+                            env=env,
+                            rigid=rigid,
+                            resolve=_resolve_type,
+                        )
 
                 # `bind` is Pure Data only: an Object-bearing value must be
                 # routed through state/carry/args/each instead (spec 11). Only
@@ -297,9 +436,26 @@ def _check_composite(
                             f"{base}.returns.{rname}",
                             at=frm,
                         )
+                    else:
+                        # The returned value must match the composite output port it
+                        # is connected to (spec 11.1, 12.3). The port may be typed by
+                        # one of this composite's own (rigid) parameters, which is
+                        # why `rigid` is in scope for the match.
+                        _check_binding_type(
+                            diags,
+                            entry,
+                            sig.outputs[rname].type_expr if rname in sig.outputs else None,
+                            f"{base}.returns.{rname}",
+                            errors.RETURN_TYPE_MISMATCH,
+                            env=env,
+                            rigid=rigid,
+                            resolve=_resolve_type,
+                        )
 
 
-def check_references(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None:
+def check_references(
+    doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig], env: TypeEnv
+) -> None:
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
         return
@@ -307,4 +463,4 @@ def check_references(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) ->
         proc = processes.get(pname)
         sig = sigs.get(pname)
         if isinstance(proc, YMap) and sig is not None and sig.kind == "composite":
-            _check_composite(diags, pname, proc, sig, sigs)
+            _check_composite(diags, pname, proc, sig, sigs, env)

@@ -1,0 +1,24 @@
+spec_version: "0.0"
+types:
+  Cup: { domain: object }
+processes:
+  wash:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      cup: { type: Cup, phase: data }
+    body:
+      nodes:
+        - { id: w, process: wash, state: { cup: { value: 3 } } }
+      returns:
+        cup: { from: w.cup }
+entry: main

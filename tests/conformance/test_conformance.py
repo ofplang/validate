@@ -59,6 +59,7 @@ IMPLEMENTED_CATEGORIES = {
     "scheduling",
     "references",
     "aggregation",
+    "bindings",
 }
 
 

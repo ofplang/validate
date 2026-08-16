@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.w.state.plate"
+notes: "A Cup bound to a Plate port. Nominal types match only themselves (spec 11.1, 8.1)."

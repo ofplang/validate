@@ -1,0 +1,44 @@
+# Every stage-A binding surface, all matching: an Object through `state`, Pure Data
+# through `bind`, a literal, an Array, and a `returns` (spec 11.1).
+spec_version: "0.0"
+types:
+  Cup: { domain: object }
+processes:
+  make_cup:
+    kind: atomic
+    inputs: {}
+    outputs:
+      cup: { type: Cup, phase: data }
+      readings: { type: "Array<Float>", phase: data }
+    objects:
+      create:
+        - outputs.cup
+  wash:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+      readings: { type: "Array<Float>", phase: data }
+      cycles: { type: Int, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      cup: { type: Cup, phase: data }
+    body:
+      nodes:
+        - { id: m, process: make_cup }
+        - id: w
+          process: wash
+          state:
+            cup: { from: m.cup }
+          bind:
+            readings: { from: m.readings }
+            cycles: { value: 3 }
+      returns:
+        cup: { from: w.cup }
+entry: main

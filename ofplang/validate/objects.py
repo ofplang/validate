@@ -57,6 +57,11 @@ class ProcSig:
     kind: str | None
     inputs: dict[str, PortSig] = field(default_factory=dict)
     outputs: dict[str, PortSig] = field(default_factory=dict)
+    # Whether the process declares `type_params` (spec 8). A generic process's port
+    # types name its own parameters, so they mean nothing until an invocation is
+    # instantiated (spec 8.1) -- passes that match types structurally use this to tell
+    # "compare these" from "leave this to the generics pass".
+    generic: bool = False
 
 
 def _port_sigs(ports: YNode | None, env: TypeEnv, tp: dict[str, str]) -> dict[str, PortSig]:
@@ -105,6 +110,7 @@ def build_signatures(doc: YMap, env: TypeEnv) -> dict[str, ProcSig]:
             kind=kind,
             inputs=_port_sigs(proc.get("inputs"), env, tp),
             outputs=_port_sigs(proc.get("outputs"), env, tp),
+            generic=proc.get("type_params") is not None,
         )
     return sigs
 

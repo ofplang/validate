@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: literal_type_mismatch
+    path: "processes.main.body.nodes.l.bind.text"
+notes: "An integer literal bound to a String port; a literal is checked as a static view value is (spec 11.1.1, 7.4)."

@@ -1,0 +1,25 @@
+spec_version: "0.0"
+processes:
+  produce:
+    kind: atomic
+    inputs: {}
+    outputs:
+      xs: { type: "Array<Int>", phase: data }
+  consume:
+    kind: atomic
+    inputs:
+      n: { type: Int, phase: data }
+    outputs:
+      ok: { type: Bool, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      ok: { type: Bool, phase: data }
+    body:
+      nodes:
+        - { id: p, process: produce }
+        - { id: c, process: consume, bind: { n: { from: p.xs } } }
+      returns:
+        ok: { from: c.ok }
+entry: main

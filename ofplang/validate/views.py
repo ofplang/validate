@@ -12,56 +12,22 @@ from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.matching import is_primitive_only, literal_conforms
 from ofplang.validate.types import (
-    PRIMITIVE_TYPES,
-    ArrayT,
-    Atom,
     TypeEnv,
-    TypeExpr,
     TypeParseError,
     is_object_bearing,
     parse_type,
     resolve_error,
 )
-from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
+from ofplang.validate.yamlnode import YMap, YScalar
 
-
-def _is_primitive_only(expr: TypeExpr) -> bool:
-    """Whether a (resolved) type is a primitive or an Array recursively of
-    primitives — the only shapes allowed as view field types (spec 7.4)."""
-    if isinstance(expr, ArrayT):
-        return _is_primitive_only(expr.elem)
-    return isinstance(expr, Atom) and expr.name in PRIMITIVE_TYPES
-
-
-def _static_value_conforms(expr: TypeExpr, value: YNode) -> bool:
-    """Recursively check a static value against a primitive-only view type.
-
-    Float intentionally accepts an integer scalar as well (spec 7.4: YAML
-    integer/float/exponent numeric forms are all acceptable Float values), but
-    requires the value to be *finite* -- NaN and infinity are not portable v0
-    static values (spec 7.4, summary rule 57).
-
-    The restriction is on the type-level static value only. It says nothing
-    about the Float values that flow at run time, which v0 does not constrain
-    here; a runner is free to route a non-finite one.
-    """
-    if isinstance(expr, ArrayT):
-        if not isinstance(value, YSeq):
-            return False
-        return all(_static_value_conforms(expr.elem, item) for item in value.items)
-    if not isinstance(value, YScalar):
-        return False
-    name = expr.name
-    if name == "Bool":
-        return value.is_bool
-    if name == "Int":
-        return value.is_int
-    if name == "Float":
-        return (value.is_float or value.is_int) and value.is_finite
-    if name == "String":
-        return value.is_str
-    return False
+# The two value-shape predicates this pass needs live in `matching` because the
+# binding-type check needs the same ones: spec 11.1.1 defines a binding literal's
+# conformance by pointing at this section's static-view-value rule, so there is one
+# implementation and two call sites. What they encode constrains the type-level
+# static value only -- it says nothing about the Float values that flow at run time,
+# which v0 does not constrain here; a runner is free to route a non-finite one.
 
 
 def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
@@ -119,7 +85,7 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
                     at=type_node,
                 )
                 continue
-            if not _is_primitive_only(expr):
+            if not is_primitive_only(expr):
                 diags.add(
                     errors.INVALID_VIEW_FIELD_TYPE,
                     "view field must be primitive Pure Data",
@@ -136,7 +102,7 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
                 continue
             if isinstance(value, YScalar) and value.is_null:
                 continue
-            if not _static_value_conforms(expr, value):
+            if not literal_conforms(expr, value):
                 diags.add(
                     errors.STATIC_VALUE_TYPE_MISMATCH,
                     "static value does not conform to field type",

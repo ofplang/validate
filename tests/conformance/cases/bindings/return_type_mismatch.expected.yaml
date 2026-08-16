@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: return_type_mismatch
+    path: "processes.main.body.returns.n"
+notes: "A returned String connected to an Int composite output port (spec 11.1, 12.3)."

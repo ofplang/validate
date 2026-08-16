@@ -1,0 +1,19 @@
+spec_version: "0.0"
+processes:
+  label:
+    kind: atomic
+    inputs:
+      text: { type: String, phase: data }
+    outputs:
+      ok: { type: Bool, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      ok: { type: Bool, phase: data }
+    body:
+      nodes:
+        - { id: l, process: label, bind: { text: { value: 3 } } }
+      returns:
+        ok: { from: l.ok }
+entry: main

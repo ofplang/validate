@@ -1,0 +1,2 @@
+outcome: valid
+notes: "A generic target's ports are matched by instantiation (spec 8.1), not by the per-binding type check; the invocation is well-typed."

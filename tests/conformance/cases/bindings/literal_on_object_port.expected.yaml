@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: literal_on_object_port
+    path: "processes.main.body.nodes.w.state.cup"
+notes: "A literal is Pure Data and cannot introduce an Object identity, so no literal is valid for an Object-bearing port (spec 11.1.1, 13)."

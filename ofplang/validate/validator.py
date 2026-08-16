@@ -173,7 +173,7 @@ def validate(
         generics_pass.check_generics(root, diags, env, sigs)
         script_pass.check_scripts(root, diags, env)
         nodes_pass.check_nodes(root, diags, sigs)
-        references_pass.check_references(root, diags, sigs)
+        references_pass.check_references(root, diags, sigs, env)
         contracts_pass.check_contracts(root, diags, env)
         scheduling_pass.check_scheduling(root, diags, mode, sigs)
 

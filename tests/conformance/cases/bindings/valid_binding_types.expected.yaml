@@ -1,0 +1,2 @@
+outcome: valid
+notes: "Baseline for the binding-type check: state, bind, an Array, a literal, and returns all matching (spec 11.1)."

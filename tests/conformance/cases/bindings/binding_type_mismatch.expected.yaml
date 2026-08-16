@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.c.bind.n"
+notes: "A String output bound to an Int input port; a bound value's type must match its port (spec 11.1)."

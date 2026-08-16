@@ -172,6 +172,19 @@ MALFORMED_REFERENCE = "malformed_reference"
 UNKNOWN_REFERENCE = "unknown_reference"
 BINDING_SOURCE_ARITY = "binding_source_arity"
 
+# --- Binding type compatibility (spec 11.1) -------------------------------
+# A bound value's resolved type must match the port it is bound to. The three
+# codes split by *what* was bound, following the same house rule as the degree
+# codes (`data_indegree` vs `object_input_no_source`): the fix differs per site.
+BINDING_TYPE_MISMATCH = "binding_type_mismatch"
+RETURN_TYPE_MISMATCH = "return_type_mismatch"
+LITERAL_TYPE_MISMATCH = "literal_type_mismatch"
+# A literal is Pure Data and cannot introduce an Object identity (spec 11.1.1, 13),
+# so it may not be bound to an Object-bearing port. Distinct from
+# `literal_type_mismatch`: the literal is not the wrong *type*, it is the wrong
+# *kind of thing* for that port, and no literal would be right.
+LITERAL_ON_OBJECT_PORT = "literal_on_object_port"
+
 
 def _collect_codes() -> frozenset[str]:
     codes = set()

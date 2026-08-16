@@ -1,0 +1,34 @@
+spec_version: "0.0"
+types:
+  Cup: { domain: object }
+  Plate: { domain: object }
+processes:
+  make_cup:
+    kind: atomic
+    inputs: {}
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      create:
+        - outputs.cup
+  wash_plate:
+    kind: atomic
+    inputs:
+      plate: { type: Plate, phase: data }
+    outputs:
+      plate: { type: Plate, phase: data }
+    objects:
+      map:
+        outputs.plate: inputs.plate
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      plate: { type: Plate, phase: data }
+    body:
+      nodes:
+        - { id: m, process: make_cup }
+        - { id: w, process: wash_plate, state: { plate: { from: m.cup } } }
+      returns:
+        plate: { from: w.plate }
+entry: main

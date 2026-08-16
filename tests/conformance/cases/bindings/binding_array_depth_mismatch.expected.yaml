@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.c.bind.n"
+notes: "Array<Int> does not match Int; matching is structural, with no unwrapping (spec 11.1, 8.1)."
