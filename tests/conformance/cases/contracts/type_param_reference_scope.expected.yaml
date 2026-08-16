@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: contract_reference_scope
+notes: >
+  `requires` may reference only `inputs.*.view` (spec 9.1). The reference scope
+  does not depend on the referenced type, so it is checked at the definition even
+  though the port is typed by a type parameter -- pinning that leaving the type
+  unresolved does not disable the rest of the contract checks.

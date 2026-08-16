@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: contract_invalid_reference
+notes: >
+  The domain of a type parameter is known at the definition even though the type
+  argument is not. An `object`-domain parameter is instantiated only by a nominal
+  Object type, whose `.view` is a view schema rather than a scalar (spec 7.4), so
+  a bare `.view` on that port is a validation error at the definition (spec 9.1).

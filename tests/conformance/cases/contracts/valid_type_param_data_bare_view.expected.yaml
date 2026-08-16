@@ -1,0 +1,5 @@
+outcome: valid
+notes: >
+  A `data`-domain type parameter may be instantiated by a primitive type, whose
+  `.view` is the scalar value itself (spec 7.4), so a bare `.view` through such a
+  port is not decidable at the definition and is not an error there (spec 9.1).

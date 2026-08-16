@@ -1,0 +1,6 @@
+outcome: valid
+notes: >
+  A view field reached through a port typed by a type parameter is not resolved
+  against a view schema at the process definition (spec 9.1): the type argument
+  is chosen at each instantiation, and the same generic process may be
+  instantiated differently at different invocations (spec 8.1).

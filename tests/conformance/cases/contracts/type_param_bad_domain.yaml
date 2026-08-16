@@ -1,0 +1,24 @@
+# One mistake -- a type parameter whose domain is not `data` or `object` -- must
+# not also produce a contract diagnostic. The port type is unresolvable, which the
+# type pass reports; deriving an unknown view field from it would report the same
+# mistake a third time.
+spec_version: "0.0"
+processes:
+  positive:
+    kind: atomic
+    type_params:
+      D: { domain: bogus }
+    inputs:
+      x: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.x.view.width > 0"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main

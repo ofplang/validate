@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: contract_type_error
+notes: >
+  `and` requires Bool operands (spec 9.2). `inputs.x.view` is unknown at the
+  definition and cannot be ruled out, but the `1` beside it can -- pinning that an
+  unresolved reference does not make the whole expression unchecked.

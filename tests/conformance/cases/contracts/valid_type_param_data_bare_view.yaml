@@ -1,0 +1,23 @@
+# A `data`-domain parameter may be instantiated by a primitive type, whose `.view`
+# is the scalar itself (spec 7.4), so a bare `.view` on such a port is not an
+# error at the definition (spec 9.1).
+spec_version: "0.0"
+processes:
+  positive:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      x: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.x.view > 0"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main

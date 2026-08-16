@@ -1,0 +1,27 @@
+# An `object`-domain parameter is instantiated only by a nominal Object type,
+# whose `.view` is a view schema and never a scalar (spec 7.4), so a bare `.view`
+# through this port is wrong at the definition however it is instantiated.
+spec_version: "0.0"
+processes:
+  seal:
+    kind: atomic
+    type_params:
+      P: { domain: object }
+    inputs:
+      plate: { type: P, phase: data }
+    outputs:
+      plate: { type: P, phase: data }
+    objects:
+      map:
+        outputs.plate: inputs.plate
+    contracts:
+      requires:
+        - expr: "inputs.plate.view > 0"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main

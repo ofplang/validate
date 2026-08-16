@@ -1,0 +1,22 @@
+# `Array<T>.view.length` is defined by v0 for every element type (spec 7.4), so it
+# resolves at the definition even when the element type is a type parameter.
+spec_version: "0.0"
+processes:
+  nonempty:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      xs: { type: Array<D>, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.xs.view.length > 0"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main

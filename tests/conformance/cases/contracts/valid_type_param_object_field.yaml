@@ -1,0 +1,44 @@
+# The spec 7.3 generic example with one contract line added. `P` has no resolved
+# type at the definition -- the type argument is chosen at each instantiation --
+# so the referenced view field is not resolved here (spec 9.1).
+spec_version: "0.0"
+traits:
+  PlateLike: {}
+types:
+  Plate96:
+    domain: object
+    implements:
+      - PlateLike
+    view:
+      well_count:
+        type: Int
+        value: 96
+processes:
+  plate_seal:
+    kind: atomic
+    type_params:
+      P: { domain: object }
+    where:
+      - "PlateLike<P>"
+    inputs:
+      plate: { type: P, phase: data }
+    outputs:
+      plate: { type: P, phase: data }
+    objects:
+      map:
+        outputs.plate: inputs.plate
+    contracts:
+      requires:
+        - expr: "inputs.plate.view.well_count == 96"
+  main:
+    kind: composite
+    inputs:
+      plate: { type: Plate96, phase: data }
+    outputs:
+      plate: { type: Plate96, phase: data }
+    body:
+      nodes:
+        - { id: s, process: plate_seal, state: { plate: { from: inputs.plate } } }
+      returns:
+        plate: { from: s.plate }
+entry: main

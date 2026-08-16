@@ -1,0 +1,22 @@
+# An unknown operand suspends judgement on itself alone. `and` still requires
+# Bool operands (spec 9.2), and the integer beside the unknown one is decidable.
+spec_version: "0.0"
+processes:
+  positive:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      x: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.x.view and 1"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main

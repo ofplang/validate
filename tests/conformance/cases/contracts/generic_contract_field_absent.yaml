@@ -1,0 +1,44 @@
+# The other half of leaving a generic contract unresolved at the definition: the
+# type argument this invocation chooses is `Blob`, which satisfies `Sized<D>` --
+# traits are nominal membership markers and promise no field (spec 7.3) -- but has
+# no `width` in its view schema. The contract is unresolvable for this
+# instantiation, and nobody checks it there yet.
+spec_version: "0.0"
+traits:
+  Sized: {}
+types:
+  Blob:
+    domain: data
+    implements:
+      - Sized
+    view:
+      size:
+        type: Int
+processes:
+  wide_enough:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    where:
+      - "Sized<D>"
+    inputs:
+      a: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.a.view.width > 0"
+  make_blob:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v: { type: Blob, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: b, process: make_blob }
+        - { id: w, process: wide_enough, bind: { a: { from: b.v } } }
+      returns: {}
+entry: main

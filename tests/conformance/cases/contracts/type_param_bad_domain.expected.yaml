@@ -1,0 +1,10 @@
+outcome: invalid
+errors:
+  - code: bad_type_param_domain
+  - code: unknown_type
+notes: >
+  A type parameter must declare a `data` or `object` domain (spec 8), and a port
+  type that names no primitive, user type, or declared parameter does not resolve
+  (spec 2.5). Both are that one mistake; the contract pass adds nothing, since a
+  reference through a port with no usable type is left alone rather than reported
+  a third time.

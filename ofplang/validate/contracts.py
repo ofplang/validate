@@ -13,6 +13,16 @@ one precise diagnostic per expression:
   * reference scope (`requires` may not read `outputs`, spec 9.1) and unknown
     view fields (spec 7.4) are caught during resolution; and
   * the whole expression must type-check to Bool (spec 9.2).
+
+Some references have no type here to check against, and the difference between
+"wrong" and "not yet knowable" is what :data:`OPAQUE` carries. A port typed by a
+type parameter is resolved only when the invocation that instantiates it is, and
+the same generic process may be instantiated differently at each call site
+(spec 9.1) -- so at the definition there is nothing to compare a field against.
+A port whose declared type does not resolve at all has already been reported by
+the type pass, and re-deriving a second finding from it would give one mistake
+two diagnostics. Both yield an opaque type: the expression around it is still
+checked in full, and only what depends on the unknown type is left alone.
 """
 
 from __future__ import annotations
@@ -31,8 +41,14 @@ from ofplang.validate.types import (
     TypeExpr,
     TypeParseError,
     parse_type,
+    process_type_params,
+    resolve_error,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
+
+# A type that exists but is not determined here (see the module docstring). Not a
+# valid identifier, so it can never collide with the name of a real type.
+OPAQUE = "?"
 
 
 class ContractError(Exception):
@@ -260,9 +276,13 @@ class _Parser:
 # --- Resolution context & type checking -----------------------------------
 @dataclass
 class ContractCtx:
-    inputs: dict[str, TypeExpr]
-    outputs: dict[str, TypeExpr]
+    # A declared port maps to its type, or to None when that type is not usable
+    # here (missing, malformed, or unresolvable). The port is still listed, so a
+    # reference to it is not mistaken for a reference to a port that is absent.
+    inputs: dict[str, TypeExpr | None]
+    outputs: dict[str, TypeExpr | None]
     view_schemas: dict[str, dict[str, TypeExpr]]  # user type -> field -> type
+    type_params: dict[str, str]  # the enclosing process's parameters -> domain
     scope: str  # 'requires' | 'ensures'
 
 
@@ -297,17 +317,47 @@ def _resolve_ref(path: list[str], ctx: ContractCtx) -> str:
     return _resolve_view_field(port_type, field, ctx)
 
 
-def _resolve_view_field(port_type: TypeExpr, field: str | None, ctx: ContractCtx) -> str:
-    """Type of `<port>.view[.field]` (spec 7.4).
+def _type_param_domain(port_type: TypeExpr | None, ctx: ContractCtx) -> str | None:
+    """The domain of the type parameter this port is typed by, else ``None``.
+
+    A declared user type wins over a parameter of the same name, matching how
+    :func:`~ofplang.validate.types.resolve_error` orders them; the shadowing
+    itself is reported by the generics pass.
+    """
+    if not isinstance(port_type, Atom) or port_type.name in ctx.view_schemas:
+        return None
+    return ctx.type_params.get(port_type.name)
+
+
+def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: ContractCtx) -> str:
+    """Type of `<port>.view[.field]` (spec 7.4, 9.1).
 
     Primitive views are the scalar itself; `Array<T>.view.length` is Int; a
     user type's fields come from its declared view schema. Any other field is an
-    unknown view field.
+    unknown view field. A port with no usable type, or one typed by a type
+    parameter, yields :data:`OPAQUE` instead -- except where the parameter's
+    domain settles the question on its own.
     """
+    if port_type is None:
+        # The type pass already reported why; see the module docstring.
+        return OPAQUE
+
+    domain = _type_param_domain(port_type, ctx)
+
     if field is None:
         # Bare `.view`: only meaningful (as a comparable scalar) for primitives.
-        if isinstance(port_type, Atom) and port_type.name in PRIMITIVE_TYPES:
-            return port_type.name
+        if isinstance(port_type, Atom):
+            if port_type.name in PRIMITIVE_TYPES:
+                return port_type.name
+            if domain == "data":
+                # This parameter may still be instantiated by a primitive (spec 9.1).
+                return OPAQUE
+            if domain == "object":
+                raise ContractError(
+                    errors.CONTRACT_INVALID_REFERENCE,
+                    f"an object-domain type parameter such as {port_type.name!r} is instantiated "
+                    "only by a nominal type, whose .view is never a scalar; a field is required",
+                )
         raise ContractError(errors.CONTRACT_INVALID_REFERENCE, "non-scalar .view needs a field")
 
     if isinstance(port_type, ArrayT):
@@ -319,6 +369,10 @@ def _resolve_view_field(port_type: TypeExpr, field: str | None, ctx: ContractCtx
         if port_type.name in PRIMITIVE_TYPES:
             # Primitives expose no named fields; their `.view` is the scalar.
             raise ContractError(errors.UNKNOWN_VIEW_FIELD, f"primitive has no field {field!r}")
+        if domain is not None:
+            # Either domain can be instantiated by a type that declares a view
+            # schema, so which fields exist is decided at instantiation (spec 9.1).
+            return OPAQUE
         schema = ctx.view_schemas.get(port_type.name, {})
         if field not in schema:
             raise ContractError(errors.UNKNOWN_VIEW_FIELD, f"unknown view field {field!r}")
@@ -337,7 +391,20 @@ _NUMERIC = {"Int", "Float"}
 
 
 def _numeric_result(a: str, b: str) -> str:
+    # An operand of unknown type makes the result unknown too, since which of
+    # Int and Float it is decides which this is.
+    if OPAQUE in (a, b):
+        return OPAQUE
     return "Int" if a == "Int" and b == "Int" else "Float"
+
+
+def _admits(t: str, allowed: frozenset[str] | set[str]) -> bool:
+    """Whether `t` is one of `allowed`, or unknown and so cannot be ruled out.
+
+    Every operand is checked with this, so an opaque operand suspends judgement
+    on itself alone: the operand beside it still has to be right.
+    """
+    return t == OPAQUE or t in allowed
 
 
 def _type_of(node, ctx: ContractCtx) -> str:
@@ -349,11 +416,11 @@ def _type_of(node, ctx: ContractCtx) -> str:
     if isinstance(node, Unary):
         t = _type_of(node.operand, ctx)
         if node.op == "not":
-            if t != "Bool":
+            if not _admits(t, {"Bool"}):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, "'not' needs Bool")
             return "Bool"
         # unary minus
-        if t not in _NUMERIC:
+        if not _admits(t, _NUMERIC):
             raise ContractError(errors.CONTRACT_TYPE_ERROR, "unary '-' needs a number")
         return t
     if isinstance(node, Binary):
@@ -361,27 +428,31 @@ def _type_of(node, ctx: ContractCtx) -> str:
         rt = _type_of(node.right, ctx)
         op = node.op
         if op in ("and", "or"):
-            if lt != "Bool" or rt != "Bool":
+            if not (_admits(lt, {"Bool"}) and _admits(rt, {"Bool"})):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, f"'{op}' needs Bool operands")
             return "Bool"
         if op in ("==", "!="):
+            # Each side must be comparable at all before the pair is considered,
+            # so a non-scalar operand is still rejected beside an opaque one.
+            if not (_admits(lt, PRIMITIVE_TYPES) and _admits(rt, PRIMITIVE_TYPES)):
+                raise ContractError(errors.CONTRACT_TYPE_ERROR, f"'{op}' operand mismatch")
             same_primitive = lt == rt and lt in PRIMITIVE_TYPES
             numeric_pair = lt in _NUMERIC and rt in _NUMERIC
-            if not (same_primitive or numeric_pair):
+            if not (OPAQUE in (lt, rt) or same_primitive or numeric_pair):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, f"'{op}' operand mismatch")
             return "Bool"
         if op in ("<", "<=", ">", ">="):
-            if not (lt in _NUMERIC and rt in _NUMERIC):
+            if not (_admits(lt, _NUMERIC) and _admits(rt, _NUMERIC)):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, "ordering needs numeric operands")
             return "Bool"
         if op in ("+", "-", "*"):
-            if not (lt in _NUMERIC and rt in _NUMERIC):
+            if not (_admits(lt, _NUMERIC) and _admits(rt, _NUMERIC)):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, f"'{op}' needs numeric operands")
             return _numeric_result(lt, rt)
         if op == "/":
-            if not (lt in _NUMERIC and rt in _NUMERIC):
+            if not (_admits(lt, _NUMERIC) and _admits(rt, _NUMERIC)):
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, "'/' needs numeric operands")
-            return "Float"
+            return "Float"  # division is Float whatever its operands are (spec 9.2)
     raise ContractError(errors.CONTRACT_TYPE_ERROR, "unrecognized expression")
 
 
@@ -437,8 +508,9 @@ def _check_expr(diags: Diagnostics, text: str, ctx: ContractCtx, path: str, at=N
     try:
         ast = _Parser(_lex(text)).parse()
         result = _type_of(ast, ctx)
-        # A contract must type-check to Bool (spec 9.2).
-        if result != "Bool":
+        # A contract must type-check to Bool (spec 9.2). An opaque result is a
+        # bare reference through a type parameter that may yet be a Bool.
+        if not _admits(result, {"Bool"}):
             raise ContractError(errors.CONTRACT_TYPE_ERROR, f"contract is {result}, not Bool")
         # Constant folding: a contract with no runtime references that is
         # statically false (or hits a static eval error like /0) is invalid at
@@ -484,17 +556,30 @@ def _build_view_schemas(doc: YMap) -> dict[str, dict[str, TypeExpr]]:
     return out
 
 
-def _port_types(ports: YNode | None) -> dict[str, TypeExpr]:
-    out: dict[str, TypeExpr] = {}
+def _port_types(
+    ports: YNode | None, env: TypeEnv, type_params: dict[str, str]
+) -> dict[str, TypeExpr | None]:
+    """Every declared port, mapped to its type where that type is usable.
+
+    A port whose type is missing, malformed, or unresolvable is still listed, but
+    with ``None``: it exists, so a reference to it is not an unknown port, and the
+    reason it has no type is already a diagnostic of the type pass.
+    """
+    out: dict[str, TypeExpr | None] = {}
     if not isinstance(ports, YMap):
         return out
     for pname in ports.keys():
         port = ports.get(pname)
-        if isinstance(port, YMap):
-            tnode = port.get("type")
-            if isinstance(tnode, YScalar) and tnode.is_str:
-                with contextlib.suppress(TypeParseError):
-                    out[pname] = parse_type(tnode.text)
+        if not isinstance(port, YMap):
+            continue
+        expr: TypeExpr | None = None
+        tnode = port.get("type")
+        if isinstance(tnode, YScalar) and tnode.is_str:
+            with contextlib.suppress(TypeParseError):
+                parsed = parse_type(tnode.text)
+                if resolve_error(parsed, env, type_params) is None:
+                    expr = parsed
+        out[pname] = expr
     return out
 
 
@@ -512,8 +597,11 @@ def check_contracts(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
         if not isinstance(contracts, YMap):
             continue
 
-        inputs = _port_types(proc.get("inputs"))
-        outputs = _port_types(proc.get("outputs"))
+        # A port type may name one of this process's type parameters (spec 2.5),
+        # which resolves but denotes no view schema until instantiation (spec 9.1).
+        type_params = process_type_params(proc)
+        inputs = _port_types(proc.get("inputs"), env, type_params)
+        outputs = _port_types(proc.get("outputs"), env, type_params)
         base = f"processes.{pname}.contracts"
 
         for scope in ("requires", "ensures"):
@@ -521,7 +609,11 @@ def check_contracts(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
             if not isinstance(section, YSeq):
                 continue
             ctx = ContractCtx(
-                inputs=inputs, outputs=outputs, view_schemas=view_schemas, scope=scope
+                inputs=inputs,
+                outputs=outputs,
+                view_schemas=view_schemas,
+                type_params=type_params,
+                scope=scope,
             )
             for i, item in enumerate(section.items):
                 if not isinstance(item, YMap):

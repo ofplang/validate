@@ -1,0 +1,5 @@
+outcome: valid
+notes: >
+  `Array<T>.view.length` is a specification-defined view and applies uniformly
+  whatever `T` is (spec 7.4), so an Array of a type parameter still resolves at
+  the definition; only the element type is unknown, and `length` does not read it.

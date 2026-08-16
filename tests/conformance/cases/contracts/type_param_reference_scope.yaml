@@ -1,0 +1,24 @@
+# Suspending judgement on the *type* of a reference through a type parameter does
+# not suspend the rest: `requires` may reference only inputs (spec 9.1), and that
+# is decidable at the definition whatever the type argument turns out to be.
+spec_version: "0.0"
+processes:
+  positive:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      x: { type: D, phase: data }
+    outputs:
+      y: { type: D, phase: data }
+    contracts:
+      requires:
+        - expr: "outputs.y.view > 0"
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes: []
+      returns: {}
+entry: main
