@@ -1,0 +1,39 @@
+# A generic process invoked through a structured node. The `each` source is
+# traversed element-wise, so matching Array<O> against Array<Cup> infers O := Cup by
+# the same recursion an ordinary binding uses (spec 8.1, 11.1, 17).
+spec_version: "0.0"
+features: [node_map, generic_processes]
+traits:
+  Washable: {}
+types:
+  Cup:
+    domain: object
+    implements:
+      - Washable
+processes:
+  wash:
+    kind: atomic
+    type_params:
+      O: { domain: object }
+    where:
+      - "Washable<O>"
+    inputs:
+      item: { type: O, phase: data }
+    outputs: {}
+    objects:
+      consume:
+        - inputs.item
+  main:
+    kind: composite
+    inputs:
+      cups: { type: "Array<Cup>", phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: wash_all
+          kind: map
+          process: wash
+          each:
+            item: { from: inputs.cups }
+      returns: {}
+entry: main

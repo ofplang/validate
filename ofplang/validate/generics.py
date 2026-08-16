@@ -1,35 +1,29 @@
-"""Generic type parameters and `where` constraints (spec 8, 8.1).
+"""Generic type parameters and `where` constraints, at the definition (spec 8, 8.1).
 
-Intent: v0 generics are deliberately minimal — parameters carry only a domain,
-constraints are nominal trait memberships, and type arguments are *inferred*
-from input bindings (there is no explicit type-argument syntax). This pass
-validates the parts that are decidable from a process definition alone:
+Intent: v0 generics are deliberately minimal — parameters carry only a domain, and
+constraints are nominal trait memberships. This pass validates what is decidable
+from a process definition alone:
 
-  * each type parameter declares a valid domain;
-  * every type parameter appears in at least one input port type (spec 8.1),
-    since inference has nothing to bind it to otherwise; and
-  * each `where` constraint is a well-formed `TraitName<Param>` naming a known
-    trait and a declared parameter.
+  * each type parameter declares a valid domain, and shadows nothing;
+  * every type parameter appears in at least one input port type (spec 8.1), since
+    inference has nothing to bind it to otherwise; and
+  * each `where` constraint is a well-formed `TraitName<Param>` naming a known trait
+    and a declared parameter.
 
-Call-site instantiation (`_check_instantiations`) then infers type arguments
-from the input bindings at each node invoking a generic process and reports the
-invocation-level errors of spec 8.1: a parameter that infers two incompatible
-concrete types (`conflicting_inference`), a parameter that cannot be inferred at
-all (`uninferable_type_param`), and a `where` constraint the inferred concrete
-type fails to satisfy (`constraint_not_satisfied`). Inference is deliberately
-conservative: it acts only on source types it can resolve to a concrete atom, so
-an unresolved or `value`-literal binding leaves a parameter indeterminate rather
-than being reported as uninferable.
+What an invocation *instantiates* those parameters to is a property of the binding,
+not of the definition, so it lives with the other binding checks in
+:mod:`ofplang.validate.bindings` — matching a value against a port and inferring a
+type argument from it are the same operation (spec 8.1), and splitting them would
+mean two passes walking the same bindings and reporting one mistake twice.
 """
 
 from __future__ import annotations
 
 import contextlib
-import re
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.objects import ProcSig
+from ofplang.validate.matching import parse_constraint
 from ofplang.validate.types import (
     BUILTIN_TYPE_NAMES,
     PRIMITIVE_TYPES,
@@ -42,10 +36,6 @@ from ofplang.validate.types import (
     process_type_params,
 )
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq
-
-# A `where` constraint: TraitName<Param>, whitespace allowed only inside the
-# angle brackets (spec 8.1) — mirrors the type-expression whitespace rule.
-_CONSTRAINT_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)<[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*>$")
 
 
 def _atoms(expr: TypeExpr) -> set[str]:
@@ -72,219 +62,7 @@ def _input_atoms(proc: YMap) -> set[str]:
     return names
 
 
-def _implements_map(doc: YMap) -> dict[str, set[str]]:
-    """user type name -> set of trait names it declares via `implements`."""
-    out: dict[str, set[str]] = {}
-    types = doc.get("types")
-    if not isinstance(types, YMap):
-        return out
-    for tname in types.keys():
-        decl = types.get(tname)
-        traits: set[str] = set()
-        if isinstance(decl, YMap):
-            impls = decl.get("implements")
-            if isinstance(impls, YSeq):
-                for item in impls.items:
-                    if isinstance(item, YScalar):
-                        traits.add(item.text)
-        out[tname] = traits
-    return out
-
-
-def _unify(
-    pexpr: TypeExpr,
-    sexpr: TypeExpr | None,
-    params: set[str],
-    bindings: dict[str, TypeExpr],
-    conflicts: set[str],
-) -> None:
-    """Infer type-parameter bindings by structural matching (spec 8.1).
-
-    Only the shapes v0 inference needs: a parameter atom binds to a concrete
-    *atomic* source type (a parameter is never bound to an Array, spec 8/8.1);
-    Array matches Array recursively; concrete-vs-concrete is left alone. When a
-    parameter would bind to two different concrete atoms it is recorded in
-    ``conflicts`` (spec 8.1: incompatible inferences for one parameter are a
-    validation error).
-    """
-    if sexpr is None:
-        return
-    if isinstance(pexpr, Atom) and pexpr.name in params:
-        if not isinstance(sexpr, Atom):
-            return  # no Array-to-parameter binding; leaves the param unbound
-        existing = bindings.get(pexpr.name)
-        if existing is None:
-            bindings[pexpr.name] = sexpr
-        elif existing != sexpr:
-            conflicts.add(pexpr.name)
-        return
-    if isinstance(pexpr, ArrayT) and isinstance(sexpr, ArrayT):
-        _unify(pexpr.elem, sexpr.elem, params, bindings, conflicts)
-
-
-def _source_type(
-    ref_text: str, comp_sig: ProcSig, sigs: dict[str, ProcSig], nodes_by_id
-) -> TypeExpr | None:
-    """Resolve a `from` reference to the concrete type of the value it names."""
-    parts = ref_text.split(".")
-    if len(parts) != 2:
-        return None
-    owner, name = parts
-    if owner == "inputs":
-        port = comp_sig.inputs.get(name)
-        return port.type_expr if port else None
-    node = nodes_by_id.get(owner)
-    if node is None:
-        return None
-    proc = node.get("process")
-    if isinstance(proc, YScalar) and proc.text in sigs:
-        out = sigs[proc.text].outputs.get(name)
-        return out.type_expr if out else None
-    return None
-
-
-def _check_instantiations(
-    doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, ProcSig]
-) -> None:
-    """Infer type arguments at ordinary call sites and check `where` (spec 8.1).
-
-    Scope: ordinary nodes invoking a generic process, with sources whose types
-    we can resolve. This is enough to enforce trait satisfaction on inferred
-    concrete types; broader inference (partial/uninferable) is future work.
-    """
-    processes = doc.get("processes")
-    if not isinstance(processes, YMap):
-        return
-    implements = _implements_map(doc)
-
-    for pname in processes.keys():
-        proc = processes.get(pname)
-        comp_sig = sigs.get(pname)
-        if not isinstance(proc, YMap) or comp_sig is None:
-            continue
-        body = proc.get("body")
-        if not isinstance(body, YMap):
-            continue
-        nodes = body.get("nodes")
-        if not isinstance(nodes, YSeq):
-            continue
-
-        nodes_by_id = {
-            nid.text: n
-            for n in nodes.items
-            if isinstance(n, YMap) and isinstance(nid := n.get("id"), YScalar)
-        }
-
-        for node in nodes.items:
-            if not isinstance(node, YMap) or node.get("kind") is not None:
-                continue  # ordinary nodes only
-            proc_ref = node.get("process")
-            if not isinstance(proc_ref, YScalar):
-                continue
-            target_def = processes.get(proc_ref.text)
-            target_sig = sigs.get(proc_ref.text)
-            if not isinstance(target_def, YMap) or target_sig is None:
-                continue
-            params = set(process_type_params(target_def))
-            if not params:
-                continue  # not a generic process
-
-            nid_node = node.get("id")
-            node_id = nid_node.text if isinstance(nid_node, YScalar) else "?"
-
-            # Resolve the source type of each bound input port. A port bound by a
-            # `value` literal, or by a `from` we cannot resolve, contributes no
-            # concrete type here and so leaves its parameters indeterminate
-            # (below) rather than provably uninferable.
-            resolved_src: dict[str, TypeExpr] = {}
-            for section in ("state", "bind"):
-                m = node.get(section)
-                if not isinstance(m, YMap):
-                    continue
-                for portname in m.keys():
-                    port = target_sig.inputs.get(portname)
-                    entry = m.get(portname)
-                    if port is None or port.type_expr is None or not isinstance(entry, YMap):
-                        continue
-                    frm = entry.get("from")
-                    if isinstance(frm, YScalar):
-                        src = _source_type(frm.text, comp_sig, sigs, nodes_by_id)
-                        if src is not None:
-                            resolved_src[portname] = src
-
-            # Infer bindings by structural matching against the resolved sources.
-            bindings: dict[str, TypeExpr] = {}
-            conflicts: set[str] = set()
-            for portname, src in resolved_src.items():
-                port = target_sig.inputs.get(portname)
-                if port is not None and port.type_expr is not None:
-                    _unify(port.type_expr, src, params, bindings, conflicts)
-
-            # For each parameter, which input ports mention it in their type.
-            param_ports: dict[str, set[str]] = {}
-            for portname, port in target_sig.inputs.items():
-                if port.type_expr is None:
-                    continue
-                for atom in _atoms(port.type_expr) & params:
-                    param_ports.setdefault(atom, set()).add(portname)
-
-            # A parameter that infers two incompatible concrete types is an error
-            # (spec 8.1). A parameter that cannot be inferred at all is an error
-            # too, but we only flag it when every port mentioning it resolved to a
-            # concrete source and matching still failed structurally — otherwise
-            # inference is merely indeterminate (unresolved/`value` source) and
-            # flagging it would be a false positive.
-            base_path = f"processes.{pname}.body.nodes.{node_id}"
-            for param in sorted(conflicts):
-                diags.add(
-                    errors.CONFLICTING_INFERENCE,
-                    f"type parameter {param!r} infers incompatible types",
-                    base_path,
-                    at=node,
-                )
-            for param in sorted(params):
-                if param in bindings or param in conflicts:
-                    continue
-                ports = param_ports.get(param, set())
-                if ports and all(p in resolved_src for p in ports):
-                    diags.add(
-                        errors.UNINFERABLE_TYPE_PARAM,
-                        f"type parameter {param!r} cannot be inferred from the bindings",
-                        base_path,
-                        at=node,
-                    )
-
-            # Check each where-constraint against the inferred concrete type.
-            where = target_def.get("where")
-            if not isinstance(where, YSeq):
-                continue
-            for item in where.items:
-                if not isinstance(item, YScalar):
-                    continue
-                cm = _CONSTRAINT_RE.match(item.text)
-                if not cm:
-                    continue  # malformed constraint reported at definition
-                trait, param = cm.group(1), cm.group(2)
-                if param in conflicts:
-                    continue  # ambiguous inference already reported
-                concrete = bindings.get(param)
-                if not isinstance(concrete, Atom):
-                    continue  # could not infer a concrete atom; skip
-                cname = concrete.name
-                if trait == "Numeric":
-                    satisfied = cname in ("Int", "Float")
-                else:
-                    satisfied = trait in implements.get(cname, set())
-                if not satisfied:
-                    diags.add(
-                        errors.CONSTRAINT_NOT_SATISFIED,
-                        f"{cname} does not satisfy {trait}<{param}>",
-                        f"processes.{pname}.body.nodes.{node_id}",
-                        at=node,
-                    )
-
-
-def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, ProcSig]) -> None:
+def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
         return
@@ -353,8 +131,8 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
                         errors.MALFORMED_CONSTRAINT, "constraint must be a string", cpath, at=item
                     )
                     continue
-                m = _CONSTRAINT_RE.match(item.text)
-                if not m:
+                parsed = parse_constraint(item.text)
+                if parsed is None:
                     diags.add(
                         errors.MALFORMED_CONSTRAINT,
                         f"malformed constraint {item.text!r}",
@@ -362,7 +140,7 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
                         at=item,
                     )
                     continue
-                trait, param = m.group(1), m.group(2)
+                trait, param = parsed
                 # The constraint must target a declared parameter of this process.
                 if param not in tp:
                     # Distinguish "constrained a concrete type" (a real, if
@@ -402,6 +180,3 @@ def check_generics(doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, 
                         cpath,
                         at=item,
                     )
-
-    # Call-site instantiation: infer type arguments and check where-constraints.
-    _check_instantiations(doc, diags, env, sigs)

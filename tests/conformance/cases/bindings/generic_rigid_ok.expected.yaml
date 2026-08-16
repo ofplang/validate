@@ -1,0 +1,5 @@
+outcome: valid
+notes: >
+  A flexible parameter may be inferred to be a rigid one of matching domain, and
+  `Washable<O>` with O := U holds because the enclosing process declares
+  `Washable<U>` (spec 8.1).

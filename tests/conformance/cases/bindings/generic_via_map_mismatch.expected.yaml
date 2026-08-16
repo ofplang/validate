@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+notes: >
+  Traversing Array<Int> would instantiate the `domain: object` parameter O with Int,
+  whose domain does not match (spec 8.1, 17).

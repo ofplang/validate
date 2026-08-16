@@ -22,6 +22,7 @@ the non-generic case needs.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 
 from ofplang.validate.objects import ProcSig
@@ -121,6 +122,21 @@ def _match(
     if not isinstance(source, Atom):
         return MatchResult.MISMATCH
     return MatchResult.OK if target.name == source.name else MatchResult.MISMATCH
+
+
+#: A `where` constraint: TraitName<Param>, whitespace allowed only immediately inside
+#: the angle brackets (spec 8.1) -- mirrors the type-expression whitespace rule.
+CONSTRAINT_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)<[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*>$")
+
+
+def parse_constraint(text: str) -> tuple[str, str] | None:
+    """A `where` entry as ``(trait, type parameter)``, or None if malformed.
+
+    Shared because both ends of a constraint need it: the generics pass checks the
+    form and the names at the *definition*, and the binding pass discharges it at
+    each *call site* once the parameter has been inferred."""
+    m = CONSTRAINT_RE.match(text)
+    return (m.group(1), m.group(2)) if m else None
 
 
 def satisfies(

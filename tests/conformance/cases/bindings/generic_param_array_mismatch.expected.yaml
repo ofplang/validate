@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+notes: >
+  `unwrap` expects xs: Array<T> but is bound a scalar Int. No T makes those match,
+  and a parameter is never bound to an Array either, so this is a structural
+  mismatch rather than a parameter that could not be inferred (spec 8.1, 11.1).

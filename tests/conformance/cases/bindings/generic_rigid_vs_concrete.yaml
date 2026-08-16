@@ -1,0 +1,30 @@
+# Inside a generic composite, U stands for a type the caller has not chosen yet, so
+# a port that requires one particular concrete type cannot be fed from it (spec 8.1).
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  wash_cup:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  hold:
+    kind: composite
+    type_params:
+      U: { domain: object }
+    inputs:
+      item: { type: U, phase: data }
+    outputs:
+      item: { type: Cup, phase: data }
+    body:
+      nodes:
+        - { id: w, process: wash_cup, state: { cup: { from: inputs.item } } }
+      returns:
+        item: { from: w.cup }
+entry: hold

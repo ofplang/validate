@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: constraint_not_satisfied
+notes: >
+  `Washable<O>` with O inferred to the rigid U is satisfied only if the enclosing
+  process declares `Washable<U>` in its own where; this one declares nothing
+  (spec 8.1).

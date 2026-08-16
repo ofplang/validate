@@ -1,0 +1,27 @@
+spec_version: "0.0"
+processes:
+  wash:
+    kind: atomic
+    type_params:
+      O: { domain: object }
+    inputs:
+      item: { type: O, phase: data }
+    outputs: {}
+    objects:
+      consume:
+        - inputs.item
+  make_int:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v: { type: Int, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: mi, process: make_int }
+        - { id: w, process: wash, state: { item: { from: mi.v } } }
+      returns: {}
+entry: main

@@ -103,6 +103,7 @@ def validate(
     """
     # Imported lazily so this module has no import-time dependency on PyYAML or
     # the pass modules — keeps the public API cheap to import.
+    from ofplang.validate import bindings as bindings_pass
     from ofplang.validate import contracts as contracts_pass
     from ofplang.validate import duplicates as duplicates_pass
     from ofplang.validate import entry as entry_pass
@@ -170,10 +171,11 @@ def validate(
         phases_pass.check_phases(root, diags, env)
         features_pass.check_features(root, diags, mode)
         objects_pass.check_objects(root, diags, env)
-        generics_pass.check_generics(root, diags, env, sigs)
+        generics_pass.check_generics(root, diags, env)
         script_pass.check_scripts(root, diags, env)
         nodes_pass.check_nodes(root, diags, sigs)
-        references_pass.check_references(root, diags, sigs, env)
+        references_pass.check_references(root, diags, sigs)
+        bindings_pass.check_bindings(root, diags, sigs, env)
         contracts_pass.check_contracts(root, diags, env)
         scheduling_pass.check_scheduling(root, diags, mode, sigs)
 

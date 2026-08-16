@@ -1,0 +1,4 @@
+outcome: valid
+notes: >
+  Inference reaches a generic process invoked through a structured node: the each
+  source's element type instantiates O, and Cup implements Washable (spec 8.1, 17).

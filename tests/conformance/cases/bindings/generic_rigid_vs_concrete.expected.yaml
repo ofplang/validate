@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+notes: >
+  A rigid parameter matches only that same rigid parameter, never a concrete type:
+  the caller may choose anything for U, so it cannot be bound to a Cup port
+  (spec 8.1, 11.1).

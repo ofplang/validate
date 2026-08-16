@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ofplang.validate.yamlnode import YMap, YScalar
+from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
 # Built-in primitive Data types (spec 7.1) and the reserved constructor/trait
 # names. `Numeric` is a trait, not a type, but shares the "reserved, cannot be
@@ -134,11 +134,15 @@ class TypeEnv:
     ``user_types`` maps a user-defined type name to its domain ('data'/'object')
     and only contains structurally well-formed declarations, so resolution can
     trust it. ``traits`` is the set of declared trait names (built-in `Numeric`
-    is handled separately and is not listed here).
+    is handled separately and is not listed here). ``implements`` maps a user type
+    to the traits it declares, which is what a `where` constraint is checked
+    against (spec 8.1) -- recorded as written, so a trait that was never declared
+    still appears here and the trait pass reports it once, where it is.
     """
 
     user_types: dict[str, str] = field(default_factory=dict)
     traits: set[str] = field(default_factory=set)
+    implements: dict[str, set[str]] = field(default_factory=dict)
 
 
 def process_type_params(proc: YMap) -> dict[str, str]:
@@ -173,6 +177,11 @@ def build_env(doc: YMap) -> TypeEnv:
                 dom_node = decl.get("domain")
                 if isinstance(dom_node, YScalar):
                     domain = dom_node.text
+                impls = decl.get("implements")
+                if isinstance(impls, YSeq):
+                    env.implements[name] = {
+                        item.text for item in impls.items if isinstance(item, YScalar)
+                    }
             # Only record recognized domains; unknown/missing domain is an error
             # reported elsewhere and simply leaves the type unresolvable here.
             if domain in ("data", "object"):

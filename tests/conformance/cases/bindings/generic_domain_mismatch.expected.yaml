@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+notes: >
+  A type parameter is instantiated only with a type whose domain matches the one it
+  declares (spec 8.1), so a `domain: object` parameter cannot be Int.
