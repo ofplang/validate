@@ -1,0 +1,17 @@
+spec_version: "0.0"
+types:
+  Cup: { domain: object, view: { v: { type: Float } } }
+processes:
+  main:
+    kind: atomic
+    inputs:
+      xs: { type: Array<Cup>, phase: data }
+    outputs:
+      ys: { type: Array<Cup>, phase: data }
+    objects:
+      transform:
+        - kind: array_reverse
+          inputs: { xs: inputs.xs }
+          outputs: { ys: outputs.ys }
+          bogus: 1
+entry: main

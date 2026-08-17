@@ -6,6 +6,11 @@ payload shape: policies live only on composite processes, and each preference
 kind fixes whether an `object` target is required or forbidden. This pass
 validates the `prefer.kind` name and its object-target rule.
 
+It also closes the policy mappings themselves (spec 2.3, 23.3) rather than
+leaving that to the shape pass: this is the walk that already descends into
+`policies`, and it is the one that knows which preference kinds v0 defines, which
+is what decides whether a `prefer` payload has a v0-defined shape at all.
+
 Placement on the wrong process kind (`scheduling` on an atomic) is reported by
 the shape pass with `scheduling_on_atomic`; to avoid double-reporting, this pass
 only inspects composite processes.
@@ -16,6 +21,7 @@ from __future__ import annotations
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.objects import ProcSig
+from ofplang.validate.shape import check_closed_map
 from ofplang.validate.validator import EXTENSION_TOLERANT
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
@@ -24,6 +30,17 @@ from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 _GAP_KINDS = {"max_gap", "min_gap"}
 _OBJECT_REQUIRED = {"temperature"}
 _V0_KINDS = _GAP_KINDS | _OBJECT_REQUIRED
+
+# The closed mappings a policy is built from (spec 23.2, 23.3, 23.4, 24.1). They
+# are closed here rather than in the shape pass because this is the walk that
+# already reaches them and already knows which preference kinds v0 defines.
+_SCHEDULING_KEYS = {"policies"}
+_POLICY_KEYS = {"during", "object", "prefer", "priority"}
+_DURING_KEYS = {"from", "to"}
+_OBJECT_KEYS = {"from"}
+# The payload shape is v0's only for a v0-defined kind (spec 26); an `x-` kind
+# carries an implementation-defined payload and is left open.
+_PREFER_KEYS = {"kind", "value", "unit"}
 
 
 def _valid_temporal(text: str, node_ids: set[str]) -> bool:
@@ -92,34 +109,89 @@ def _check_policy(
     diags: Diagnostics, policy: YMap, base: str, mode: str,
     node_ids: set[str], comp_sig: ProcSig, nodes_by_id, sigs,
 ) -> None:
-    prefer = policy.get("prefer")
-    kind = None
-    if isinstance(prefer, YMap):
-        kind_node = prefer.get("kind")
-        if isinstance(kind_node, YScalar):
-            kind = kind_node.text
+    check_closed_map(diags, policy, _POLICY_KEYS, base, mode)
 
-    has_object = policy.get("object") is not None
+    # `during` is required and is a from/to interval (spec 23.2, 23.3). Checked
+    # before the preference kind, because the interval is a separate concern: an
+    # unrecognized kind says nothing about whether the policy has an interval.
+    during = policy.get("during")
+    if during is None:
+        diags.add(
+            errors.MISSING_REQUIRED_KEY, "policy requires 'during'", f"{base}.during", at=policy
+        )
+    elif isinstance(during, YMap):
+        check_closed_map(diags, during, _DURING_KEYS, f"{base}.during", mode)
+
+    # `priority` is optional, and an integer scalar when written (spec 23.3).
+    priority = policy.get("priority")
+    if priority is not None and not (isinstance(priority, YScalar) and priority.is_int):
+        diags.add(
+            errors.WRONG_VALUE_KIND,
+            "priority must be an integer scalar",
+            f"{base}.priority",
+            at=priority,
+        )
+
+    obj = policy.get("object")
+    has_object = obj is not None
+    if isinstance(obj, YMap):
+        check_closed_map(diags, obj, _OBJECT_KEYS, f"{base}.object", mode)
+
+    # `prefer` is required, is a closed mapping, and names a kind (spec 23.3). Each
+    # of those is its own failure: `unknown_prefer_kind` means what it says -- a
+    # name v0 does not define -- rather than standing in for a missing section, a
+    # missing key, or the wrong value kind.
+    prefer = policy.get("prefer")
+    if prefer is None:
+        diags.add(
+            errors.MISSING_REQUIRED_KEY, "policy requires 'prefer'", f"{base}.prefer", at=policy
+        )
+        return
+    if not isinstance(prefer, YMap):
+        diags.add(
+            errors.WRONG_VALUE_KIND, "prefer must be a mapping", f"{base}.prefer", at=prefer
+        )
+        return
+    kind_node = prefer.get("kind")
+    if kind_node is None:
+        diags.add(
+            errors.MISSING_REQUIRED_KEY, "prefer requires 'kind'", f"{base}.prefer.kind", at=prefer
+        )
+        return
+    if not isinstance(kind_node, YScalar) or not kind_node.is_str:
+        diags.add(
+            errors.WRONG_VALUE_KIND,
+            "prefer.kind must be a string scalar",
+            f"{base}.prefer.kind",
+            at=kind_node,
+        )
+        return
+    kind = kind_node.text
 
     # Unknown preference kind: only x- extension kinds are tolerated, and only in
     # extension-tolerant mode (spec 23.4).
-    if kind is None or (kind not in _V0_KINDS and not kind.startswith("x-")):
+    if kind not in _V0_KINDS and not kind.startswith("x-"):
         diags.add(
             errors.UNKNOWN_PREFER_KIND,
             f"unknown prefer kind {kind!r}",
             f"{base}.prefer.kind",
-            at=prefer,
+            at=kind_node,
         )
         return
     if kind.startswith("x-"):
+        # An extension kind's payload is implementation-defined, so it is not
+        # closed here (spec 26).
         if mode != EXTENSION_TOLERANT:
             diags.add(
                 errors.UNKNOWN_PREFER_KIND,
                 f"extension kind {kind!r}",
                 f"{base}.prefer.kind",
-                at=prefer,
+                at=kind_node,
             )
         return
+
+    # A v0-defined kind fixes the payload's shape (spec 26).
+    check_closed_map(diags, prefer, _PREFER_KEYS, f"{base}.prefer", mode)
 
     # Object-target rules with dedicated codes so the author sees the exact rule.
     if kind in _GAP_KINDS and has_object:
@@ -133,7 +205,7 @@ def _check_policy(
         )
 
     # Preference payload shape and numeric constraints for v0 kinds (spec 23.4).
-    if isinstance(prefer, YMap) and (reason := _payload_reason(prefer, kind)) is not None:
+    if (reason := _payload_reason(prefer, kind)) is not None:
         diags.add(
             errors.MALFORMED_PREFER_PAYLOAD,
             f"{kind} payload {reason}",
@@ -142,7 +214,6 @@ def _check_policy(
         )
 
     # Temporal interval endpoints must be valid temporal references (spec 23.1).
-    during = policy.get("during")
     if isinstance(during, YMap):
         for endpoint in ("from", "to"):
             ep = during.get(endpoint)
@@ -157,7 +228,6 @@ def _check_policy(
     # An object target that is required/allowed must be Object-bearing (spec 24.1).
     # Skipped for gap kinds, where the object was already rejected outright.
     if has_object and kind not in _GAP_KINDS:
-        obj = policy.get("object")
         frm = obj.get("from") if isinstance(obj, YMap) else None
         if isinstance(frm, YScalar):
             ob = _object_bearing_target(frm.text, comp_sig, nodes_by_id, sigs)
@@ -185,8 +255,19 @@ def check_scheduling(doc: YMap, diags: Diagnostics, mode: str, sigs: dict[str, P
         scheduling = proc.get("scheduling")
         if not isinstance(scheduling, YMap):
             continue
+        check_closed_map(
+            diags, scheduling, _SCHEDULING_KEYS, f"processes.{pname}.scheduling", mode
+        )
         policies = scheduling.get("policies")
+        if policies is None:
+            continue
         if not isinstance(policies, YSeq):
+            diags.add(
+                errors.WRONG_VALUE_KIND,
+                "policies must be a sequence",
+                f"processes.{pname}.scheduling.policies",
+                at=policies,
+            )
             continue
 
         # Temporal references may name direct child node ids of this body, plus

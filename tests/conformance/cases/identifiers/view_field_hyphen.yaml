@@ -1,0 +1,11 @@
+# View field names are declaration sites and must match the v0 identifier
+# grammar (spec 2.4).
+spec_version: "0.0"
+types:
+  Img:
+    domain: data
+    view:
+      bad-name: { type: Int }
+processes:
+  main: { kind: atomic, inputs: {}, outputs: {} }
+entry: main

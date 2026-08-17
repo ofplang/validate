@@ -1,0 +1,4 @@
+outcome: valid
+notes: >
+  `value` and `type` are reserved names, but not for view fields (spec 2.4). The
+  contract reference `inputs.c.view.value` resolves the field unambiguously.

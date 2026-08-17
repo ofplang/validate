@@ -1,0 +1,13 @@
+spec_version: "0.0"
+processes:
+  step: { kind: atomic, inputs: {}, outputs: {} }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: s, process: step }
+      returns: {}
+      bogus: 1
+entry: main

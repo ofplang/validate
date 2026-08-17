@@ -1,0 +1,30 @@
+spec_version: "0.0"
+features: [scheduling_policies]
+types:
+  Cup: { domain: object, view: { v: { type: Float } } }
+processes:
+  step:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      map: { outputs.cup: inputs.cup }
+  main:
+    kind: composite
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    scheduling:
+      policies:
+        - during: { from: self.start, to: self.end }
+          object: { from: inputs.cup, bogus: 1 }
+          prefer: { kind: temperature, value: 4, unit: C }
+    body:
+      nodes:
+        - { id: s, process: step, state: { cup: { from: inputs.cup } } }
+      returns:
+        cup: { from: s.cup }
+entry: main

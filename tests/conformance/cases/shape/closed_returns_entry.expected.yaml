@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A `body.returns` entry connects an internal output to the boundary (spec 12.3); it is closed to the source-entry keys.

@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: dot_in_identifier
+notes: >
+  `.` is reserved as the path separator and is not allowed in any v0 identifier,
+  view field names included (spec 2.4).

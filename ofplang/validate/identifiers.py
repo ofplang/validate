@@ -35,13 +35,19 @@ RESERVED_NAMES = frozenset(
 )
 
 
-def classify_name(name: str) -> str | None:
+def classify_name(name: str, *, reserved: bool = True) -> str | None:
     """Return the error code for a declared ``name``, or ``None`` if it is legal.
 
     The order matters: a dot is called out specifically (it is the reserved
     path separator, spec 2.4) so the author gets a precise reason, before the
     generic grammar failure. Reserved-word collisions are only meaningful once
     the name is otherwise grammatical.
+
+    ``reserved=False`` applies the grammar without the reserved-name list, which
+    is what a view field name gets (spec 2.4): it is only ever an outer key in a
+    view schema -- the declaration keys `type` and `value` sit *inside* it -- or
+    the single segment after `.view` in a contract reference, so no reserved word
+    can be mistaken for a structural key there.
     """
     if not _IDENT_RE.match(name):
         # Distinguish the common, intentional-looking "used a dotted/qualified
@@ -49,24 +55,26 @@ def classify_name(name: str) -> str | None:
         if "." in name:
             return errors.DOT_IN_IDENTIFIER
         return errors.INVALID_IDENTIFIER
-    if name in RESERVED_NAMES:
+    if reserved and name in RESERVED_NAMES:
         return errors.RESERVED_NAME
     return None
 
 
-def _check(diags: Diagnostics, name: str, path: str, at=None) -> None:
-    code = classify_name(name)
+def _check(diags: Diagnostics, name: str, path: str, at=None, *, reserved: bool = True) -> None:
+    code = classify_name(name, reserved=reserved)
     if code is not None:
         diags.add(code, f"invalid identifier {name!r}", path, at=at)
 
 
-def _check_map_keys(diags: Diagnostics, node: YNode | None, base: str) -> None:
+def _check_map_keys(
+    diags: Diagnostics, node: YNode | None, base: str, *, reserved: bool = True
+) -> None:
     """Validate every key of a mapping as a declaration name."""
     if not isinstance(node, YMap):
         return
     for key in node.keys():
         # Anchor the diagnostic at the declaring key node.
-        _check(diags, key, f"{base}.{key}", at=node.key_node(key))
+        _check(diags, key, f"{base}.{key}", at=node.key_node(key), reserved=reserved)
 
 
 def check_identifiers(doc: YMap, diags: Diagnostics) -> None:
@@ -81,6 +89,17 @@ def check_identifiers(doc: YMap, diags: Diagnostics) -> None:
     _check_map_keys(diags, doc.get("processes"), "processes")
     _check_map_keys(diags, doc.get("types"), "types")
     _check_map_keys(diags, doc.get("traits"), "traits")
+
+    # View field names are declaration sites too (spec 2.4), grammar-only: the
+    # reserved-name list does not reach them (see `classify_name`).
+    types = doc.get("types")
+    if isinstance(types, YMap):
+        for tname in types.keys():
+            decl = types.get(tname)
+            if isinstance(decl, YMap):
+                _check_map_keys(
+                    diags, decl.get("view"), f"types.{tname}.view", reserved=False
+                )
 
     processes = doc.get("processes")
     if not isinstance(processes, YMap):

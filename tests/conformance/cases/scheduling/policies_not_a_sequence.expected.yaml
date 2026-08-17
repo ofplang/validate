@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+notes: "`scheduling.policies` is a sequence of policy entries (spec 23.3)."

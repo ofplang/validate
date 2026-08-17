@@ -1,0 +1,12 @@
+spec_version: "0.0"
+features: [python_script_processes]
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+    script:
+      language: python
+      code: "return {}"
+      bogus: 1
+entry: main

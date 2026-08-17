@@ -1,0 +1,15 @@
+# `kind` selects which sections are legal and drives Object tracking, so a value
+# v0 does not define leaves the process unvalidatable rather than merely odd
+# (spec 10, 26). Object ports here would otherwise be checked for fate and
+# provenance; an unrecognized kind must not be a way to skip that silently.
+spec_version: "0.0"
+types:
+  Cup: { domain: object, view: { volume_ul: { type: Float } } }
+processes:
+  main:
+    kind: bogus
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+entry: main

@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: invalid_identifier
+notes: "A v0 identifier may not begin with a digit (spec 2.4)."

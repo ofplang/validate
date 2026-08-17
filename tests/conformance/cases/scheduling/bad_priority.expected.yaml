@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+notes: >
+  `priority` must be a YAML integer scalar when present; negative values are
+  allowed and omission means 0 (spec 23.3).

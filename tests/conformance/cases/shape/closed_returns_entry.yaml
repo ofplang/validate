@@ -1,0 +1,18 @@
+spec_version: "0.0"
+processes:
+  produce:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v: { type: Int, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      r: { type: Int, phase: data }
+    body:
+      nodes:
+        - { id: p, process: produce }
+      returns:
+        r: { from: p.v, bogus: 1 }
+entry: main

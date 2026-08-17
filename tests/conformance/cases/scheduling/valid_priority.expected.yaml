@@ -1,0 +1,2 @@
+outcome: valid
+notes: "`priority` is an optional integer scalar and negative values are allowed (spec 23.3)."

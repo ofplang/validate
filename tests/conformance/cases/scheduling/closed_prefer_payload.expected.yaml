@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  For a v0-defined preference kind the `prefer` payload has a v0-defined closed
+  shape of `kind`, `value`, and `unit` (spec 23.4.1, 26).

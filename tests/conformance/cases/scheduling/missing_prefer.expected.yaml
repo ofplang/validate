@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+notes: >
+  `prefer` is required in a scheduling policy entry (spec 23.3). A missing
+  section is not an unknown preference kind.

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A composite `body` holds `nodes` and `returns` (spec 10.2).

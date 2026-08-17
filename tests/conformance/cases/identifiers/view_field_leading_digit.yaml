@@ -1,0 +1,9 @@
+spec_version: "0.0"
+types:
+  Img:
+    domain: data
+    view:
+      1bad: { type: Int }
+processes:
+  main: { kind: atomic, inputs: {}, outputs: {} }
+entry: main

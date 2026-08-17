@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  The `objects` section holds `map`, `consume`, `create`, and `transform` (spec 14.1-14.4); every defined mapping position is closed (spec 2.3).

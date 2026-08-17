@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: "A `during` interval is written as `from` and `to` (spec 23.2)."

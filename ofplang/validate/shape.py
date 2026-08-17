@@ -31,6 +31,10 @@ _TOP_LEVEL_KEYS = {
     "spec_version", "features", "traits", "types", "processes", "entry", "description",
 }
 
+# The two process kinds v0 defines (spec 10). An implementation-defined kind is
+# not accepted, in either mode (spec 26), so this is not mode-dependent.
+_PROCESS_KINDS = {"atomic", "composite"}
+
 # Per-kind allowed process keys. The *misplaced* section variants — `objects`
 # on a composite, `scheduling` on an atomic — get their own specific codes
 # (spec 10.2, 23.3). To avoid also reporting them as generic unknown keys, both
@@ -89,23 +93,56 @@ _NODE_ALLOWED = {
     "branch": {"id", "kind", "condition", "args", "then", "else", "outputs"},
 }
 
+# The node kinds v0 defines (spec 17-21). `ordinary` is this module's name for a
+# node that writes no `kind` at all, not a value that may be written, so it is
+# excluded -- `kind: ordinary` is as unknown as any other undefined value.
+_NODE_KINDS = frozenset(_NODE_ALLOWED) - {"ordinary"}
+
+# Closed mappings nested inside a process, all of them positions v0 defines
+# (spec 2.3). Grouped here so "what is closed, and to what" is one table.
+_OBJECTS_KEYS = {"map", "consume", "create", "transform"}          # spec 14.1-14.4
+_TRANSFORM_ENTRY_KEYS = {"kind", "inputs", "outputs"}              # spec 14.4
+_CONTRACTS_KEYS = {"requires", "ensures"}                          # spec 9.1
+_CONTRACT_ENTRY_KEYS = {"expr"}                                    # spec 9
+_SCRIPT_KEYS = {"language", "code"}                                # spec 22
+_BODY_KEYS = {"nodes", "returns"}                                  # spec 10.2
+_OUTPUTS_ENTRY_KEYS = {"mode"}                                     # spec 21
+_ARM_KEYS = {"process"}                                            # spec 20
+# A source entry carries exactly one of from/value (spec 2.6.6); the arity is the
+# reference pass's concern, the key set is this one's. `body.returns` entries are
+# closed to the same pair: v0 does not define their keys, and this is the set that
+# rejects nothing already accepted.
+_SOURCE_ENTRY_KEYS = {"from", "value"}
+# `condition` differs by node kind: a branch reads a body dataflow reference, a
+# do_while names one of the target's outputs (spec 2.6.7).
+_CONDITION_KEYS = {"branch": {"from"}, "do_while": {"output"}}
+# Node sections whose values are per-port source entries (spec 11).
+_BINDING_SECTIONS = ("state", "bind", "carry", "each", "args")
+
 
 def _check_node_sections(diags: Diagnostics, item: YMap, npath: str, mode: str) -> None:
     """Enforce the closed section set for a body node's kind (spec 2.3, 11, 21).
 
     A section defined for some node kind but not this one is reported with the
     dedicated `section_not_valid_for_kind` code; a key defined for no node kind
-    is an ordinary unknown key. An unrecognized `kind` value defers section
-    placement (allow the union) so we do not spuriously flag on top of the
-    separate unknown-kind concern.
+    is an ordinary unknown key. An unrecognized `kind` value is reported once,
+    and section placement then defers to the union of every kind's sections: the
+    author has one thing to fix, and guessing which sections they meant would
+    bury it under errors derived from it.
     """
     kind_node = item.get("kind")
     nk = kind_node.text if isinstance(kind_node, YScalar) else None
     if nk is None:
         allowed = _NODE_ALLOWED["ordinary"]
-    elif nk in _NODE_ALLOWED:
+    elif nk in _NODE_KINDS:
         allowed = _NODE_ALLOWED[nk]
     else:
+        diags.add(
+            errors.UNKNOWN_NODE_KIND,
+            f"unknown node kind {nk!r}",
+            f"{npath}.kind",
+            at=kind_node,
+        )
         allowed = set().union(*_NODE_ALLOWED.values())
 
     for key in item.keys():
@@ -129,6 +166,53 @@ def _check_node_sections(diags: Diagnostics, item: YMap, npath: str, mode: str) 
             diags.add(errors.UNKNOWN_KEY, f"unknown key {key!r}", f"{npath}.{key}", at=key_node)
 
 
+def _check_node_interior(diags: Diagnostics, item: YMap, npath: str, mode: str) -> None:
+    """Close the mappings *inside* a body node (spec 2.3, 11, 20, 21, 2.6.6, 2.6.7).
+
+    Reached from the same walk as the node's own sections, so nothing here costs a
+    second traversal. Only mappings are inspected; a section or entry written as
+    the wrong value kind is left to the pass that reads it.
+    """
+    kind_node = item.get("kind")
+    nk = kind_node.text if isinstance(kind_node, YScalar) else None
+
+    # Per-port source entries in every binding section.
+    for section in _BINDING_SECTIONS:
+        ports = item.get(section)
+        if not isinstance(ports, YMap):
+            continue
+        for portname in ports.keys():
+            entry = ports.get(portname)
+            if isinstance(entry, YMap):
+                check_closed_map(
+                    diags, entry, _SOURCE_ENTRY_KEYS,
+                    f"{npath}.{section}.{portname}", mode,
+                )
+
+    # Output-shaping entries: one `mode` per exposed port (spec 21).
+    outs = item.get("outputs")
+    if isinstance(outs, YMap):
+        for portname in outs.keys():
+            entry = outs.get(portname)
+            if isinstance(entry, YMap):
+                check_closed_map(
+                    diags, entry, _OUTPUTS_ENTRY_KEYS, f"{npath}.outputs.{portname}", mode
+                )
+
+    # `condition` is shaped by the node kind, so an unknown kind has no shape to
+    # check against and is left alone -- the kind itself is already reported.
+    cond = item.get("condition")
+    if isinstance(cond, YMap) and nk in _CONDITION_KEYS:
+        check_closed_map(diags, cond, _CONDITION_KEYS[nk], f"{npath}.condition", mode)
+
+    # Branch arms name a process and nothing else; arguments come from `args`
+    # (spec 20).
+    for arm in ("then", "else"):
+        arm_node = item.get(arm)
+        if isinstance(arm_node, YMap):
+            check_closed_map(diags, arm_node, _ARM_KEYS, f"{npath}.{arm}", mode)
+
+
 def _classify_extension_key(key: str, mode: str) -> str | None:
     """Decide how a non-standard key is treated, independent of position.
 
@@ -148,14 +232,19 @@ def _classify_extension_key(key: str, mode: str) -> str | None:
     return None
 
 
-def _check_closed_map(
+def check_closed_map(
     diags: Diagnostics,
     node: YMap,
-    allowed: set[str],
+    allowed: set[str] | frozenset[str],
     base: str,
     mode: str,
 ) -> None:
-    """Report keys not in ``allowed`` at a closed mapping position."""
+    """Report keys not in ``allowed`` at a closed mapping position.
+
+    Public because closedness is enforced wherever a position is already being
+    walked: the scheduling pass closes the policy mappings it visits rather than
+    making this module walk them a second time.
+    """
     for key in node.keys():
         # Point the diagnostic at the offending key node itself.
         key_node = node.key_node(key)
@@ -278,7 +367,7 @@ def _check_types_and_traits(diags: Diagnostics, doc: YMap, mode: str) -> None:
         for name in traits.keys():
             decl = traits.get(name)
             if isinstance(decl, YMap):
-                _check_closed_map(diags, decl, _TRAIT_KEYS, f"traits.{name}", mode)
+                check_closed_map(diags, decl, _TRAIT_KEYS, f"traits.{name}", mode)
 
     types = doc.get("types")
     if isinstance(types, YMap):
@@ -286,13 +375,13 @@ def _check_types_and_traits(diags: Diagnostics, doc: YMap, mode: str) -> None:
             decl = types.get(name)
             if not isinstance(decl, YMap):
                 continue
-            _check_closed_map(diags, decl, _TYPE_KEYS, f"types.{name}", mode)
+            check_closed_map(diags, decl, _TYPE_KEYS, f"types.{name}", mode)
             view = decl.get("view")
             if isinstance(view, YMap):
                 for fname in view.keys():
                     field = view.get(fname)
                     if isinstance(field, YMap):
-                        _check_closed_map(
+                        check_closed_map(
                             diags, field, _VIEW_FIELD_KEYS, f"types.{name}.view.{fname}", mode
                         )
 
@@ -304,11 +393,21 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
         diags.add(errors.WRONG_VALUE_KIND, "process must be a mapping", base, at=proc)
         return
 
-    # `kind` is required and selects which sections are legal (spec 10).
+    # `kind` is required and selects which sections are legal (spec 10). A value
+    # v0 does not define is reported once; section placement then defers to the
+    # union of both kinds' keys, so the one thing to fix is not buried under
+    # errors derived from it.
     kind_node = proc.get("kind")
     kind = kind_node.text if isinstance(kind_node, YScalar) else None
     if kind is None:
         diags.add(errors.MISSING_REQUIRED_KEY, "process requires 'kind'", f"{base}.kind", at=proc)
+    elif kind not in _PROCESS_KINDS:
+        diags.add(
+            errors.UNKNOWN_PROCESS_KIND,
+            f"unknown process kind {kind!r}",
+            f"{base}.kind",
+            at=kind_node,
+        )
 
     # Placement rules with dedicated codes: objects only on atomic (spec 14),
     # scheduling only on composite (spec 23.3). Emit the specific code and rely
@@ -337,7 +436,7 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
         allowed = _COMPOSITE_KEYS
     else:
         allowed = _ATOMIC_KEYS | _COMPOSITE_KEYS
-    _check_closed_map(diags, proc, allowed, base, mode)
+    check_closed_map(diags, proc, allowed, base, mode)
 
     # Close the process's type-parameter and port declaration mappings
     # (spec 6, 8). `type`/`phase` *presence* on a port is a required-key concern
@@ -348,7 +447,7 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
         for tpname in type_params.keys():
             decl = type_params.get(tpname)
             if isinstance(decl, YMap):
-                _check_closed_map(
+                check_closed_map(
                     diags, decl, _TYPE_PARAM_KEYS, f"{base}.type_params.{tpname}", mode
                 )
     for section in ("inputs", "outputs"):
@@ -357,15 +456,60 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
             for portname in ports.keys():
                 port = ports.get(portname)
                 if isinstance(port, YMap):
-                    _check_closed_map(
+                    check_closed_map(
                         diags, port, _PORT_KEYS, f"{base}.{section}.{portname}", mode
                     )
+
+    # The remaining closed mappings a process may carry. Placement (which kind may
+    # carry `objects` / `scheduling` / `body`) is judged above; this only asks what
+    # keys the section itself may hold, which does not depend on the kind.
+    objects = proc.get("objects")
+    if isinstance(objects, YMap):
+        check_closed_map(diags, objects, _OBJECTS_KEYS, f"{base}.objects", mode)
+        transform = objects.get("transform")
+        if isinstance(transform, YSeq):
+            for i, entry in enumerate(transform.items):
+                if isinstance(entry, YMap):
+                    check_closed_map(
+                        diags, entry, _TRANSFORM_ENTRY_KEYS,
+                        f"{base}.objects.transform[{i}]", mode,
+                    )
+
+    contracts = proc.get("contracts")
+    if isinstance(contracts, YMap):
+        check_closed_map(diags, contracts, _CONTRACTS_KEYS, f"{base}.contracts", mode)
+        for scope in ("requires", "ensures"):
+            section_node = contracts.get(scope)
+            if isinstance(section_node, YSeq):
+                for i, entry in enumerate(section_node.items):
+                    if isinstance(entry, YMap):
+                        check_closed_map(
+                            diags, entry, _CONTRACT_ENTRY_KEYS,
+                            f"{base}.contracts.{scope}[{i}]", mode,
+                        )
+
+    script = proc.get("script")
+    if isinstance(script, YMap):
+        check_closed_map(diags, script, _SCRIPT_KEYS, f"{base}.script", mode)
 
     # Composite body: each node must carry an `id` and a `process` target
     # (spec 11). Deeper per-kind node shape is validated in the node layer.
     if kind == "composite":
         body = proc.get("body")
         if isinstance(body, YMap):
+            check_closed_map(diags, body, _BODY_KEYS, f"{base}.body", mode)
+            # A return connects an internal output to the boundary (spec 12.3).
+            # v0 does not enumerate the entry's keys; closing it to the source-entry
+            # pair rejects nothing that was accepted before.
+            returns = body.get("returns")
+            if isinstance(returns, YMap):
+                for rname in returns.keys():
+                    ret = returns.get(rname)
+                    if isinstance(ret, YMap):
+                        check_closed_map(
+                            diags, ret, _SOURCE_ENTRY_KEYS,
+                            f"{base}.body.returns.{rname}", mode,
+                        )
             nodes = body.get("nodes")
             if isinstance(nodes, YSeq):
                 for i, item in enumerate(nodes.items):
@@ -373,8 +517,10 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
                     if not isinstance(item, YMap):
                         diags.add(errors.WRONG_VALUE_KIND, "node must be a mapping", npath, at=item)
                         continue
-                    # Closed section set for the node's kind (spec 2.3, 11, 21).
+                    # Closed section set for the node's kind (spec 2.3, 11, 21),
+                    # then the mappings inside those sections.
                     _check_node_sections(diags, item, npath, mode)
+                    _check_node_interior(diags, item, npath, mode)
                     if item.get("id") is None:
                         diags.add(
                             errors.MISSING_REQUIRED_KEY,
@@ -416,7 +562,7 @@ def check_shape(doc: YNode, diags: Diagnostics, mode: str) -> None:
         return
 
     _scan_nulls(diags, doc, "<root>")
-    _check_closed_map(diags, doc, _TOP_LEVEL_KEYS, "<root>", mode)
+    check_closed_map(diags, doc, _TOP_LEVEL_KEYS, "<root>", mode)
     _check_spec_version(diags, doc)
     _check_descriptions(diags, doc)
     _check_types_and_traits(diags, doc, mode)

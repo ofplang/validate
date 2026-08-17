@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: unknown_process_kind
+notes: >
+  v0 defines exactly two process kinds, `atomic` and `composite` (spec 10), and
+  core validation does not accept an implementation-defined one in either mode
+  (spec 26).

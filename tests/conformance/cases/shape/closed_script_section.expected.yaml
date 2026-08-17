@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A `script` section declares `language` and `code` (spec 22).

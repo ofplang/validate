@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: "An object policy target is written as `from` (spec 24.1)."

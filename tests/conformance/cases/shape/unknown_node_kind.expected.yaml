@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: unknown_node_kind
+notes: >
+  v0 defines `map`, `fold`, `do_while`, and `branch`; a node that writes no
+  `kind` is an ordinary node (spec 17-21). An implementation-defined node kind is
+  not accepted in either mode (spec 26).

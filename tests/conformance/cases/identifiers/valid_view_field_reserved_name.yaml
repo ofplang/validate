@@ -1,0 +1,21 @@
+# View field names are the one declaration position the reserved-name list does
+# not reach (spec 2.4): the field name is the outer key and the declaration keys
+# `type` and `value` are inside it, and a contract reads it as the single segment
+# after `.view`, so neither position can confuse it with a structural key.
+spec_version: "0.0"
+types:
+  Count:
+    domain: data
+    view:
+      value: { type: Int }
+      type: { type: String }
+processes:
+  main:
+    kind: atomic
+    inputs:
+      c: { type: Count, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.c.view.value >= 0"
+entry: main

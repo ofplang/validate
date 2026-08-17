@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A branch arm names a `process`; arguments are supplied through `args` (spec 20).

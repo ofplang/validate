@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  An output-shaping entry declares a `mode` and nothing else (spec 21).

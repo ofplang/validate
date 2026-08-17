@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+notes: >
+  `prefer` must contain a required `kind` field (spec 23.3). A missing `kind` is
+  not an unknown preference kind.

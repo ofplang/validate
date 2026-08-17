@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: invalid_identifier
+notes: "A hyphen is not in the v0 identifier grammar (spec 2.4)."

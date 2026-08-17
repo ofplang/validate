@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+notes: "`during` is required in a scheduling policy entry (spec 23.3)."

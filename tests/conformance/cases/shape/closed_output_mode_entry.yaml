@@ -1,0 +1,27 @@
+spec_version: "0.0"
+features: [node_fold]
+processes:
+  step:
+    kind: atomic
+    inputs:
+      acc: { type: Int, phase: data }
+      x: { type: Int, phase: data }
+    outputs:
+      acc: { type: Int, phase: data }
+  main:
+    kind: composite
+    inputs:
+      xs: { type: Array<Int>, phase: data }
+      a0: { type: Int, phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: f
+          kind: fold
+          process: step
+          each: { x: { from: inputs.xs } }
+          carry: { acc: { from: inputs.a0 } }
+          outputs:
+            acc: { mode: carry, bogus: 1 }
+      returns: {}
+entry: main

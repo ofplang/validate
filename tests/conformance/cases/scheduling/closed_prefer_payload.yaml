@@ -1,0 +1,17 @@
+spec_version: "0.0"
+features: [scheduling_policies]
+processes:
+  step: { kind: atomic, inputs: {}, outputs: {} }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    scheduling:
+      policies:
+        - during: { from: self.start, to: self.end }
+          prefer: { kind: max_gap, value: 10, unit: min, bogus: 1 }
+    body:
+      nodes:
+        - { id: s, process: step }
+      returns: {}
+entry: main

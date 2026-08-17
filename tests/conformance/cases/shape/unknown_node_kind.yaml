@@ -1,0 +1,17 @@
+# A node's `kind` selects its legal sections and its required feature, so an
+# undefined value is an error rather than an ordinary node (spec 21, 26).
+spec_version: "0.0"
+processes:
+  wash:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: w, kind: frobnicate, process: wash }
+      returns: {}
+entry: main

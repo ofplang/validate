@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A policy entry allows `during`, `object`, `prefer`, and `priority`; spec 23.3
+  states that unknown keys in a policy entry are validation errors.

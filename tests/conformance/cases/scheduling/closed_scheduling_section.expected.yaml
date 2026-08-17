@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: "The `scheduling` section holds `policies` (spec 23.3); defined mapping positions are closed (spec 2.3)."

@@ -21,6 +21,13 @@ MISSING_REQUIRED_KEY = "missing_required_key"
 WRONG_VALUE_KIND = "wrong_value_kind"
 SECTION_NOT_VALID_FOR_KIND = "section_not_valid_for_kind"
 OBJECTS_ON_COMPOSITE = "objects_on_composite"
+# A `kind` naming something v0 does not define (spec 10, 21, 26). Split by where
+# it sits, following the same house rule as `unknown_transform_kind` and
+# `unknown_prefer_kind`: the fix is in a different place for each. Not accepted in
+# extension-tolerant mode either -- an implementation-defined kind makes the
+# document an extended dialect rather than portable v0 (spec 26).
+UNKNOWN_PROCESS_KIND = "unknown_process_kind"
+UNKNOWN_NODE_KIND = "unknown_node_kind"
 
 # --- Reserved metadata (spec 2.1, 2.7) ------------------------------------
 MALFORMED_SPEC_VERSION = "malformed_spec_version"

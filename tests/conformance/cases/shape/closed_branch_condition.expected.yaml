@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  `branch.condition` is a body dataflow reference written as `from` (spec 2.6.7).

@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: unknown_node_kind
+notes: >
+  An ordinary node is one with no `kind` key at all (spec 11); `ordinary` is not
+  among the node kinds v0 defines (spec 17-21, 26).

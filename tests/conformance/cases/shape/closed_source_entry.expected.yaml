@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+notes: >
+  A binding source entry carries exactly one of `from` and `value` (spec 2.6.6), and nothing else.

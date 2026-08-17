@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+notes: "`prefer` must be a mapping (spec 23.3)."
