@@ -43,6 +43,7 @@ from ofplang.validate.types import (
     parse_type,
     process_type_params,
     resolve_error,
+    show_type,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
@@ -504,7 +505,9 @@ def _eval(node):
     raise ContractError(errors.CONTRACT_TYPE_ERROR, "uncomputable constant")
 
 
-def _check_expr(diags: Diagnostics, text: str, ctx: ContractCtx, path: str, at=None) -> None:
+def _check_expr(
+    diags: Diagnostics, text: str, ctx: ContractCtx, path: str, at=None, detail: str = ""
+) -> None:
     try:
         ast = _Parser(_lex(text)).parse()
         result = _type_of(ast, ctx)
@@ -528,7 +531,7 @@ def _check_expr(diags: Diagnostics, text: str, ctx: ContractCtx, path: str, at=N
     except ContractError as exc:
         # Position points at the contract expression scalar (the whole line);
         # sub-token offsets within the expression are not tracked in v1.
-        diags.add(exc.code, str(exc), path, at=at)
+        diags.add(exc.code, f"{exc}{detail}", path, at=at)
 
 
 # --- View schema + port type collection -----------------------------------
@@ -556,14 +559,13 @@ def _build_view_schemas(doc: YMap) -> dict[str, dict[str, TypeExpr]]:
     return out
 
 
-def _port_types(
-    ports: YNode | None, env: TypeEnv, type_params: dict[str, str]
-) -> dict[str, TypeExpr | None]:
-    """Every declared port, mapped to its type where that type is usable.
+def _parse_port_types(ports: YNode | None) -> dict[str, TypeExpr | None]:
+    """Every declared port, mapped to its parsed type, or ``None`` when it has
+    none to parse.
 
-    A port whose type is missing, malformed, or unresolvable is still listed, but
-    with ``None``: it exists, so a reference to it is not an unknown port, and the
-    reason it has no type is already a diagnostic of the type pass.
+    A port with a missing or malformed type is still listed: it exists, so a
+    reference to it is not a reference to an unknown port, and why it has no type
+    is already a diagnostic of the type pass.
     """
     out: dict[str, TypeExpr | None] = {}
     if not isinstance(ports, YMap):
@@ -576,11 +578,132 @@ def _port_types(
         tnode = port.get("type")
         if isinstance(tnode, YScalar) and tnode.is_str:
             with contextlib.suppress(TypeParseError):
-                parsed = parse_type(tnode.text)
-                if resolve_error(parsed, env, type_params) is None:
-                    expr = parsed
+                expr = parse_type(tnode.text)
         out[pname] = expr
     return out
+
+
+def _gate(
+    ports: dict[str, TypeExpr | None], env: TypeEnv, type_params: dict[str, str]
+) -> dict[str, TypeExpr | None]:
+    """Drop to ``None`` every port type that does not resolve (see the docstring)."""
+    return {
+        name: expr if expr is not None and resolve_error(expr, env, type_params) is None else None
+        for name, expr in ports.items()
+    }
+
+
+def _port_types(
+    ports: YNode | None, env: TypeEnv, type_params: dict[str, str]
+) -> dict[str, TypeExpr | None]:
+    """Every declared port, mapped to its type where that type is usable here."""
+    return _gate(_parse_port_types(ports), env, type_params)
+
+
+def _substitute(expr: TypeExpr, args: dict[str, TypeExpr]) -> TypeExpr:
+    """Replace type parameters by the arguments one invocation inferred for them.
+
+    A parameter with no entry is left as it is, and so fails to resolve against the
+    target's now-empty parameter scope -- which is what leaves an invocation that
+    determined nothing unchecked rather than checked against a guess.
+    """
+    if isinstance(expr, ArrayT):
+        return ArrayT(_substitute(expr.elem, args))
+    return args.get(expr.name, expr)
+
+
+class InstantiatedContracts:
+    """The other half of leaving a generic contract unresolved at its definition.
+
+    A contract on a generic process is checked twice: once where it is written,
+    against what is knowable without a type argument (:func:`check_contracts`), and
+    once per invocation, against the type arguments that invocation inferred
+    (spec 9.1). The second pass is this class, driven from the binding pass, which
+    is where those arguments are worked out -- inferring them and then walking the
+    same invocations again to check contracts would be one traversal too many.
+
+    Substituting the arguments and re-running the same checker is the whole
+    mechanism, so each way an instantiated contract can fail already has the code
+    it deserves: a field the concrete type does not declare is `unknown_view_field`,
+    a field of the wrong type is `contract_type_error`, and a bare `.view` on a
+    parameter that turned out to be a nominal type is `contract_invalid_reference`.
+
+    Two things keep it quiet. A contract that was already faulted at its definition
+    is not re-reported at every call site, so a parse error stays one diagnostic.
+    And a verdict is reached once per (contract, type arguments): invoking the same
+    process the same way ten times is one finding, since it is one thing to fix,
+    while invoking it with a different argument is a different finding.
+    """
+
+    def __init__(self, doc: YMap, env: TypeEnv) -> None:
+        self._view_schemas = _build_view_schemas(doc)
+        self._env = env
+        self._seen: set[tuple] = set()
+
+    def check(
+        self,
+        diags: Diagnostics,
+        pname: str,
+        proc: YMap,
+        args: dict[str, TypeExpr],
+        path: str,
+        at=None,
+    ) -> None:
+        contracts = proc.get("contracts")
+        if not isinstance(contracts, YMap) or not args:
+            return
+        type_params = process_type_params(proc)
+        if not type_params:
+            return  # nothing to instantiate; the definition check was complete
+
+        raw_inputs = _parse_port_types(proc.get("inputs"))
+        raw_outputs = _parse_port_types(proc.get("outputs"))
+        # The target's parameters are gone once substituted, so the instantiated
+        # scope declares none: whatever is left unsubstituted stops resolving and
+        # is left alone, which is how a partial inference stays unchecked.
+        sub = {name: _substitute(e, args) if e else None for name, e in raw_inputs.items()}
+        sub_out = {name: _substitute(e, args) if e else None for name, e in raw_outputs.items()}
+        inst_inputs = _gate(sub, self._env, {})
+        inst_outputs = _gate(sub_out, self._env, {})
+        def_inputs = _gate(raw_inputs, self._env, type_params)
+        def_outputs = _gate(raw_outputs, self._env, type_params)
+
+        shown = ", ".join(f"{p} := {show_type(t)}" for p, t in sorted(args.items()))
+        arg_key = tuple(sorted(args.items()))
+
+        for scope in ("requires", "ensures"):
+            section = contracts.get(scope)
+            if not isinstance(section, YSeq):
+                continue
+            for i, item in enumerate(section.items):
+                if not isinstance(item, YMap):
+                    continue
+                expr_node = item.get("expr")
+                if not (isinstance(expr_node, YScalar) and expr_node.is_str):
+                    continue
+                key = (pname, scope, i, arg_key)
+                if key in self._seen:
+                    continue
+                self._seen.add(key)
+                # Whatever the definition already faulted is not this invocation's
+                # doing, and re-deriving it here would report it once per call site.
+                at_definition = Diagnostics()
+                _check_expr(
+                    at_definition,
+                    expr_node.text,
+                    ContractCtx(def_inputs, def_outputs, self._view_schemas, type_params, scope),
+                    "",
+                )
+                if at_definition.items:
+                    continue
+                _check_expr(
+                    diags,
+                    expr_node.text,
+                    ContractCtx(inst_inputs, inst_outputs, self._view_schemas, {}, scope),
+                    path,
+                    at=at,
+                    detail=f" ({scope}[{i}] of {pname!r} instantiated with {shown})",
+                )
 
 
 def check_contracts(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:

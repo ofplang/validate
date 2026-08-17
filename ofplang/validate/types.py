@@ -126,6 +126,11 @@ def parse_type(text: str) -> TypeExpr:
     return _Parser(text).parse()
 
 
+def show_type(expr: TypeExpr) -> str:
+    """A type expression back in v0 source form, for a diagnostic message."""
+    return f"Array<{show_type(expr.elem)}>" if isinstance(expr, ArrayT) else expr.name
+
+
 # --- Document type environment --------------------------------------------
 @dataclass
 class TypeEnv:

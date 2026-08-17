@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: contract_type_error
+notes: >
+  Ordering requires numeric operands (spec 9.2). `D` instantiates to `Img`, whose
+  `label` field is `String`, so the comparison is a type error at this invocation
+  -- undecidable at the definition, where the operand's type was not yet known
+  (spec 9.1).

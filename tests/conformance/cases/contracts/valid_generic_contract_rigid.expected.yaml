@@ -1,0 +1,7 @@
+outcome: valid
+notes: >
+  A flexible parameter may be inferred to be a rigid one (spec 8.1), and a rigid
+  parameter is not a concrete type, so the callee's contract has no resolved type
+  to be checked against at that invocation and stays unresolved (spec 9.1). Pins
+  that instantiation is followed one step and not composed through the call tree:
+  `Cup` has no `serial` field, so a recursive reading would report here.

@@ -1,0 +1,42 @@
+# The same shape as `generic_contract_field_absent`, with a type argument that does
+# declare the field: instantiating a generic contract must not report a document
+# that satisfies it.
+spec_version: "0.0"
+traits:
+  Sized: {}
+types:
+  Img:
+    domain: data
+    implements:
+      - Sized
+    view:
+      width:
+        type: Int
+processes:
+  wide_enough:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    where:
+      - "Sized<D>"
+    inputs:
+      a: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.a.view.width > 0"
+  make_img:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v: { type: Img, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: m, process: make_img }
+        - { id: w, process: wide_enough, bind: { a: { from: m.v } } }
+      returns: {}
+entry: main

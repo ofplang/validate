@@ -1,0 +1,59 @@
+# `wash_twice` instantiates `wash`'s parameter `O` to its own parameter `U`, which
+# is rigid: still not a concrete type, so `wash`'s contract stays unresolved there.
+# Instantiation is followed one step, not composed through the call tree -- `Cup`
+# declares no `serial` field, so recursing from `main` would report one here.
+spec_version: "0.0"
+traits:
+  Washable: {}
+types:
+  Cup:
+    domain: object
+    implements:
+      - Washable
+    view:
+      volume_ul:
+        type: Float
+processes:
+  wash:
+    kind: atomic
+    type_params:
+      O: { domain: object }
+    where:
+      - "Washable<O>"
+    inputs:
+      item: { type: O, phase: data }
+    outputs:
+      item: { type: O, phase: data }
+    objects:
+      map:
+        outputs.item: inputs.item
+    contracts:
+      requires:
+        - expr: "inputs.item.view.serial > 0"
+  wash_twice:
+    kind: composite
+    type_params:
+      U: { domain: object }
+    where:
+      - "Washable<U>"
+    inputs:
+      item: { type: U, phase: data }
+    outputs:
+      item: { type: U, phase: data }
+    body:
+      nodes:
+        - { id: w, process: wash, state: { item: { from: inputs.item } } }
+      returns:
+        item: { from: w.item }
+  main:
+    kind: composite
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs:
+      cup: { type: Cup, phase: data }
+    body:
+      nodes:
+        - { id: t, process: wash_twice, state: { item: { from: inputs.cup } } }
+      returns:
+        cup: { from: t.item }
+entry: main

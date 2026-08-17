@@ -1,11 +1,6 @@
 outcome: invalid
 errors:
   - code: unknown_view_field
-pending: >
-  Contracts are checked only at the process definition, so no pass resolves this
-  contract against the type argument the invocation infers. The definition
-  correctly leaves the reference unresolved (spec 9.1); what is missing is the
-  other half -- checking it once the instantiation is known.
 notes: >
   A contract expression may reference only fields present in the resolved type's
   view schema (spec 9.1). This invocation instantiates `D` to `Blob`, whose view

@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: contract_invalid_reference
+notes: >
+  Only a primitive type's `.view` is the scalar itself (spec 7.4). A `data`-domain
+  parameter may be a primitive, so the definition cannot reject a bare `.view`
+  (spec 9.1) -- but this invocation instantiates it to the nominal type `Img`,
+  where the same expression has no scalar to compare.

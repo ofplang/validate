@@ -50,6 +50,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ofplang.validate import errors
+from ofplang.validate.contracts import InstantiatedContracts
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.matching import (
     MatchResult,
@@ -71,17 +72,13 @@ from ofplang.validate.types import (
     is_object_bearing,
     process_type_params,
     resolve_error,
+    show_type,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Binding sections that carry `from`/`value` source entries, in a fixed order so
 # inference visits an invocation's ports the same way every run.
 _SECTIONS = ("state", "bind", "carry", "each", "args")
-
-
-def _show(expr: TypeExpr) -> str:
-    """A type expression back in v0 source form, for a diagnostic message."""
-    return f"Array<{_show(expr.elem)}>" if isinstance(expr, ArrayT) else expr.name
 
 
 def _usable(expr: TypeExpr | None, env: TypeEnv, params: dict[str, str]) -> bool:
@@ -102,7 +99,8 @@ class _Invocation:
     parameters, so an argument matched against both must not let one arm's inference
     leak into the other's."""
 
-    def __init__(self, target: ProcSig | None, definition: YNode | None) -> None:
+    def __init__(self, name: str, target: ProcSig | None, definition: YNode | None) -> None:
+        self.name = name
         self.sig = target
         self.definition = definition
         self.flexible = process_type_params(definition) if isinstance(definition, YMap) else {}
@@ -167,7 +165,7 @@ def _check_entry(
         if is_object_bearing(want, env, rigid):
             diags.add(
                 errors.LITERAL_ON_OBJECT_PORT,
-                f"a literal cannot be bound to the Object-bearing port type {_show(want)}",
+                f"a literal cannot be bound to the Object-bearing port type {show_type(want)}",
                 path,
                 at=value,
             )
@@ -176,7 +174,7 @@ def _check_entry(
         elif is_primitive_only(want) and not literal_conforms(want, value):
             diags.add(
                 errors.LITERAL_TYPE_MISMATCH,
-                f"literal does not conform to the port type {_show(want)}",
+                f"literal does not conform to the port type {show_type(want)}",
                 path,
                 at=value,
             )
@@ -210,14 +208,14 @@ def _check_entry(
     if array_code is not None and isinstance(want, ArrayT) and not isinstance(got, ArrayT):
         diags.add(
             array_code,
-            f"an each source must be an Array; {_show(got)} cannot be traversed",
+            f"an each source must be an Array; {show_type(got)} cannot be traversed",
             path,
             at=frm,
         )
         return
     diags.add(
         code,
-        f"value of type {_show(got)} bound to a port of type {_show(want)}",
+        f"value of type {show_type(got)} bound to a port of type {show_type(want)}",
         path,
         at=frm,
     )
@@ -307,9 +305,9 @@ def _report_instantiation(
             rigid_where=rigid_where,
         ):
             detail = (
-                f"the enclosing process does not declare {trait}<{_show(concrete)}>"
+                f"the enclosing process does not declare {trait}<{show_type(concrete)}>"
                 if isinstance(concrete, Atom) and concrete.name in rigid
-                else f"{_show(concrete)} does not implement {trait}"
+                else f"{show_type(concrete)} does not implement {trait}"
             )
             diags.add(
                 errors.CONSTRAINT_NOT_SATISFIED,
@@ -327,12 +325,14 @@ def _targets(node: YMap, kind: str | None, sigs, processes: YMap) -> list[_Invoc
             arm_node = node.get(arm)
             proc = arm_node.get("process") if isinstance(arm_node, YMap) else None
             if isinstance(proc, YScalar):
-                out.append(_Invocation(arm_sig(node, arm, sigs), processes.get(proc.text)))
+                out.append(
+                    _Invocation(proc.text, arm_sig(node, arm, sigs), processes.get(proc.text))
+                )
         return out
     proc = node.get("process")
     if not isinstance(proc, YScalar):
         return []
-    return [_Invocation(sigs.get(proc.text), processes.get(proc.text))]
+    return [_Invocation(proc.text, sigs.get(proc.text), processes.get(proc.text))]
 
 
 def _check_composite(
@@ -343,6 +343,7 @@ def _check_composite(
     sigs: dict[str, ProcSig],
     processes: YMap,
     env: TypeEnv,
+    instantiated: InstantiatedContracts,
 ) -> None:
     body = proc.get("body")
     if not isinstance(body, YMap):
@@ -434,6 +435,18 @@ def _check_composite(
                 rigid=rigid,
                 rigid_where=rigid_where,
             )
+            # The target's contracts, against what this invocation instantiates it
+            # to (spec 9.1). Skipped for an invocation that mismatched or inferred
+            # a parameter two ways: the substitution is then partial or wrong, and
+            # one mistake should not produce a second, derived diagnostic.
+            if (
+                isinstance(inv.definition, YMap)
+                and not inv.mismatched
+                and not inv.conflicts
+            ):
+                instantiated.check(
+                    diags, inv.name, inv.definition, inv.bindings, f"{base}.nodes.{nid}", node
+                )
 
         # A branch selects an arm, so its condition must be Boolean Data (spec 20).
         if kind == "branch":
@@ -444,7 +457,7 @@ def _check_composite(
                 if got is not None and got != Atom("Bool"):
                     diags.add(
                         errors.BAD_CONDITION_TYPE,
-                        f"branch condition is {_show(got)}, not Bool",
+                        f"branch condition is {show_type(got)}, not Bool",
                         f"{base}.nodes.{nid}.condition",
                         at=frm,
                     )
@@ -480,8 +493,11 @@ def check_bindings(
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
         return
+    # One instance for the document, so a contract faulted by two call sites that
+    # instantiate it the same way is reported once.
+    instantiated = InstantiatedContracts(doc, env)
     for pname in processes.keys():
         proc = processes.get(pname)
         sig = sigs.get(pname)
         if isinstance(proc, YMap) and sig is not None and sig.kind == "composite":
-            _check_composite(diags, pname, proc, sig, sigs, processes, env)
+            _check_composite(diags, pname, proc, sig, sigs, processes, env, instantiated)

@@ -1,0 +1,5 @@
+outcome: valid
+notes: >
+  `D` instantiates to `Img`, whose view schema declares `width: Int`, so the
+  contract resolves against the resolved type (spec 9.1) and holds. Pins that
+  checking a contract at its instantiation does not report a satisfied one.

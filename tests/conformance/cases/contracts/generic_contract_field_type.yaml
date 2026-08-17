@@ -1,0 +1,36 @@
+# The field exists once `D` is known, but not with a type the expression can use.
+# Substituting the type argument and re-running the same checker gives this the
+# code it would have had on a concrete port.
+spec_version: "0.0"
+types:
+  Img:
+    domain: data
+    view:
+      label:
+        type: String
+processes:
+  labelled:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      a: { type: D, phase: data }
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.a.view.label > 0"
+  make_img:
+    kind: atomic
+    inputs: {}
+    outputs:
+      v: { type: Img, phase: data }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - { id: m, process: make_img }
+        - { id: w, process: labelled, bind: { a: { from: m.v } } }
+      returns: {}
+entry: main
