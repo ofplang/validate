@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body
+notes: >
+  A composite `body` is a mapping of `nodes` and `returns` (spec 10.2). Nothing else
+  reads a body that is not one, so the shape pass is where it is reported.

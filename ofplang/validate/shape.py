@@ -6,6 +6,13 @@ position only spec-defined keys are allowed, and unknown keys are errors
 placement rules that do not require a resolved type model, so that later passes
 can assume a structurally sane tree.
 
+Value kind is part of that: at every position this pass inspects, a value of the
+wrong kind is reported here (``wrong_value_kind``) rather than skipped. It used to
+be left "to the pass that reads it", but for most of these positions no pass reads
+it -- a `body` written as a string, or a port declaration written as a scalar, was
+accepted outright -- and a document nothing rejects is one every consumer has to
+survive on its own.
+
 Two cross-cutting rules are handled here because they apply regardless of
 position:
   * ``null`` is never a valid value in v0 (spec 2.3), enforced by a whole-tree
@@ -170,47 +177,45 @@ def _check_node_interior(diags: Diagnostics, item: YMap, npath: str, mode: str) 
     """Close the mappings *inside* a body node (spec 2.3, 11, 20, 21, 2.6.6, 2.6.7).
 
     Reached from the same walk as the node's own sections, so nothing here costs a
-    second traversal. Only mappings are inspected; a section or entry written as
-    the wrong value kind is left to the pass that reads it.
+    second traversal. A section or entry written as the wrong value kind is reported
+    here: this is the only pass that looks at these positions structurally.
     """
     kind_node = item.get("kind")
     nk = kind_node.text if isinstance(kind_node, YScalar) else None
 
     # Per-port source entries in every binding section.
     for section in _BINDING_SECTIONS:
-        ports = item.get(section)
-        if not isinstance(ports, YMap):
+        ports = _want_map(diags, item.get(section), f"{npath}.{section}", section)
+        if ports is None:
             continue
         for portname in ports.keys():
-            entry = ports.get(portname)
-            if isinstance(entry, YMap):
-                check_closed_map(
-                    diags, entry, _SOURCE_ENTRY_KEYS,
-                    f"{npath}.{section}.{portname}", mode,
-                )
+            path = f"{npath}.{section}.{portname}"
+            entry = _want_map(diags, ports.get(portname), path, "a binding source entry")
+            if entry is not None:
+                check_closed_map(diags, entry, _SOURCE_ENTRY_KEYS, path, mode)
 
     # Output-shaping entries: one `mode` per exposed port (spec 21).
-    outs = item.get("outputs")
-    if isinstance(outs, YMap):
+    outs = _want_map(diags, item.get("outputs"), f"{npath}.outputs", "outputs")
+    if outs is not None:
         for portname in outs.keys():
-            entry = outs.get(portname)
-            if isinstance(entry, YMap):
-                check_closed_map(
-                    diags, entry, _OUTPUTS_ENTRY_KEYS, f"{npath}.outputs.{portname}", mode
-                )
+            path = f"{npath}.outputs.{portname}"
+            entry = _want_map(diags, outs.get(portname), path, "an output-shaping entry")
+            if entry is not None:
+                check_closed_map(diags, entry, _OUTPUTS_ENTRY_KEYS, path, mode)
 
     # `condition` is shaped by the node kind, so an unknown kind has no shape to
     # check against and is left alone -- the kind itself is already reported.
-    cond = item.get("condition")
-    if isinstance(cond, YMap) and nk in _CONDITION_KEYS:
+    cond = _want_map(diags, item.get("condition"), f"{npath}.condition", "condition")
+    if cond is not None and nk in _CONDITION_KEYS:
         check_closed_map(diags, cond, _CONDITION_KEYS[nk], f"{npath}.condition", mode)
 
     # Branch arms name a process and nothing else; arguments come from `args`
     # (spec 20).
     for arm in ("then", "else"):
-        arm_node = item.get(arm)
-        if isinstance(arm_node, YMap):
-            check_closed_map(diags, arm_node, _ARM_KEYS, f"{npath}.{arm}", mode)
+        path = f"{npath}.{arm}"
+        arm_node = _want_map(diags, item.get(arm), path, f"a branch {arm} arm")
+        if arm_node is not None:
+            check_closed_map(diags, arm_node, _ARM_KEYS, path, mode)
 
 
 def _classify_extension_key(key: str, mode: str) -> str | None:
@@ -290,6 +295,26 @@ def _scan_nulls(diags: Diagnostics, node: YNode, base: str) -> None:
             _scan_nulls(diags, v, f"{base}.{k.text}")
 
 
+def _want_map(diags: Diagnostics, node: YNode | None, path: str, what: str) -> YMap | None:
+    """The mapping at `path`, or None -- reporting the kind when something else is there.
+
+    Absent is not a kind error (whether a position is required is a different rule,
+    owned by the check that requires it), so None passes through silently.
+    """
+    if node is None or isinstance(node, YMap):
+        return node
+    diags.add(errors.WRONG_VALUE_KIND, f"{what} must be a mapping", path, at=node)
+    return None
+
+
+def _want_seq(diags: Diagnostics, node: YNode | None, path: str, what: str) -> YSeq | None:
+    """The sequence at `path`, or None -- reporting the kind when something else is there."""
+    if node is None or isinstance(node, YSeq):
+        return node
+    diags.add(errors.WRONG_VALUE_KIND, f"{what} must be a sequence", path, at=node)
+    return None
+
+
 def _check_spec_version(diags: Diagnostics, doc: YMap) -> None:
     """Validate reserved `spec_version` metadata format (spec 2.1).
 
@@ -358,32 +383,32 @@ def _check_types_and_traits(diags: Diagnostics, doc: YMap, mode: str) -> None:
     """Close the type/trait layer's declaration mappings (spec 2.3, 7.2, 7.4).
 
     Each trait definition, type definition, and view-field declaration is a
-    closed mapping. Only mappings are inspected; a non-mapping declaration is
-    left to the type-resolution passes (it simply fails to resolve there), so
-    this pass does not add a value-kind error for it.
+    closed mapping, and one written as another kind is reported here. A type
+    declaration that is not a mapping also fails to resolve later, so such a
+    document collects the consequence as well as the cause; the cause is the one
+    that says what to change.
     """
-    traits = doc.get("traits")
-    if isinstance(traits, YMap):
+    traits = _want_map(diags, doc.get("traits"), "traits", "traits")
+    if traits is not None:
         for name in traits.keys():
-            decl = traits.get(name)
-            if isinstance(decl, YMap):
+            decl = _want_map(diags, traits.get(name), f"traits.{name}", "a trait definition")
+            if decl is not None:
                 check_closed_map(diags, decl, _TRAIT_KEYS, f"traits.{name}", mode)
 
-    types = doc.get("types")
-    if isinstance(types, YMap):
+    types = _want_map(diags, doc.get("types"), "types", "types")
+    if types is not None:
         for name in types.keys():
-            decl = types.get(name)
-            if not isinstance(decl, YMap):
+            decl = _want_map(diags, types.get(name), f"types.{name}", "a type definition")
+            if decl is None:
                 continue
             check_closed_map(diags, decl, _TYPE_KEYS, f"types.{name}", mode)
-            view = decl.get("view")
-            if isinstance(view, YMap):
+            view = _want_map(diags, decl.get("view"), f"types.{name}.view", "view")
+            if view is not None:
                 for fname in view.keys():
-                    field = view.get(fname)
-                    if isinstance(field, YMap):
-                        check_closed_map(
-                            diags, field, _VIEW_FIELD_KEYS, f"types.{name}.view.{fname}", mode
-                        )
+                    path = f"types.{name}.view.{fname}"
+                    field = _want_map(diags, view.get(fname), path, "a view field declaration")
+                    if field is not None:
+                        check_closed_map(diags, field, _VIEW_FIELD_KEYS, path, mode)
 
 
 def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str) -> None:
@@ -442,76 +467,80 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
     # (spec 6, 8). `type`/`phase` *presence* on a port is a required-key concern
     # owned by the type pass; here we only reject unknown keys, so a port
     # carrying e.g. `description` (spec 2.7 does not define it there) is flagged.
-    type_params = proc.get("type_params")
-    if isinstance(type_params, YMap):
+    type_params = _want_map(
+        diags, proc.get("type_params"), f"{base}.type_params", "type_params"
+    )
+    if type_params is not None:
         for tpname in type_params.keys():
-            decl = type_params.get(tpname)
-            if isinstance(decl, YMap):
-                check_closed_map(
-                    diags, decl, _TYPE_PARAM_KEYS, f"{base}.type_params.{tpname}", mode
-                )
+            path = f"{base}.type_params.{tpname}"
+            decl = _want_map(diags, type_params.get(tpname), path, "a type parameter")
+            if decl is not None:
+                check_closed_map(diags, decl, _TYPE_PARAM_KEYS, path, mode)
     for section in ("inputs", "outputs"):
-        ports = proc.get(section)
-        if isinstance(ports, YMap):
-            for portname in ports.keys():
-                port = ports.get(portname)
-                if isinstance(port, YMap):
-                    check_closed_map(
-                        diags, port, _PORT_KEYS, f"{base}.{section}.{portname}", mode
-                    )
+        ports = _want_map(diags, proc.get(section), f"{base}.{section}", section)
+        if ports is None:
+            continue
+        for portname in ports.keys():
+            path = f"{base}.{section}.{portname}"
+            port = _want_map(diags, ports.get(portname), path, "a port declaration")
+            if port is not None:
+                check_closed_map(diags, port, _PORT_KEYS, path, mode)
 
     # The remaining closed mappings a process may carry. Placement (which kind may
     # carry `objects` / `scheduling` / `body`) is judged above; this only asks what
     # keys the section itself may hold, which does not depend on the kind.
-    objects = proc.get("objects")
-    if isinstance(objects, YMap):
+    objects = _want_map(diags, proc.get("objects"), f"{base}.objects", "objects")
+    if objects is not None:
         check_closed_map(diags, objects, _OBJECTS_KEYS, f"{base}.objects", mode)
-        transform = objects.get("transform")
-        if isinstance(transform, YSeq):
-            for i, entry in enumerate(transform.items):
-                if isinstance(entry, YMap):
-                    check_closed_map(
-                        diags, entry, _TRANSFORM_ENTRY_KEYS,
-                        f"{base}.objects.transform[{i}]", mode,
-                    )
+        transform = _want_seq(
+            diags, objects.get("transform"), f"{base}.objects.transform", "transform"
+        )
+        if transform is not None:
+            for i, item in enumerate(transform.items):
+                path = f"{base}.objects.transform[{i}]"
+                entry = _want_map(diags, item, path, "a transform entry")
+                if entry is not None:
+                    check_closed_map(diags, entry, _TRANSFORM_ENTRY_KEYS, path, mode)
 
-    contracts = proc.get("contracts")
-    if isinstance(contracts, YMap):
+    contracts = _want_map(diags, proc.get("contracts"), f"{base}.contracts", "contracts")
+    if contracts is not None:
         check_closed_map(diags, contracts, _CONTRACTS_KEYS, f"{base}.contracts", mode)
         for scope in ("requires", "ensures"):
-            section_node = contracts.get(scope)
-            if isinstance(section_node, YSeq):
-                for i, entry in enumerate(section_node.items):
-                    if isinstance(entry, YMap):
-                        check_closed_map(
-                            diags, entry, _CONTRACT_ENTRY_KEYS,
-                            f"{base}.contracts.{scope}[{i}]", mode,
-                        )
+            section_node = _want_seq(
+                diags, contracts.get(scope), f"{base}.contracts.{scope}", scope
+            )
+            if section_node is None:
+                continue
+            for i, item in enumerate(section_node.items):
+                path = f"{base}.contracts.{scope}[{i}]"
+                entry = _want_map(diags, item, path, "a contract entry")
+                if entry is not None:
+                    check_closed_map(diags, entry, _CONTRACT_ENTRY_KEYS, path, mode)
 
-    script = proc.get("script")
-    if isinstance(script, YMap):
+    script = _want_map(diags, proc.get("script"), f"{base}.script", "script")
+    if script is not None:
         check_closed_map(diags, script, _SCRIPT_KEYS, f"{base}.script", mode)
 
     # Composite body: each node must carry an `id` and a `process` target
     # (spec 11). Deeper per-kind node shape is validated in the node layer.
     if kind == "composite":
-        body = proc.get("body")
-        if isinstance(body, YMap):
+        body = _want_map(diags, proc.get("body"), f"{base}.body", "body")
+        if body is not None:
             check_closed_map(diags, body, _BODY_KEYS, f"{base}.body", mode)
             # A return connects an internal output to the boundary (spec 12.3).
             # v0 does not enumerate the entry's keys; closing it to the source-entry
             # pair rejects nothing that was accepted before.
-            returns = body.get("returns")
-            if isinstance(returns, YMap):
+            returns = _want_map(
+                diags, body.get("returns"), f"{base}.body.returns", "returns"
+            )
+            if returns is not None:
                 for rname in returns.keys():
-                    ret = returns.get(rname)
-                    if isinstance(ret, YMap):
-                        check_closed_map(
-                            diags, ret, _SOURCE_ENTRY_KEYS,
-                            f"{base}.body.returns.{rname}", mode,
-                        )
-            nodes = body.get("nodes")
-            if isinstance(nodes, YSeq):
+                    path = f"{base}.body.returns.{rname}"
+                    ret = _want_map(diags, returns.get(rname), path, "a return entry")
+                    if ret is not None:
+                        check_closed_map(diags, ret, _SOURCE_ENTRY_KEYS, path, mode)
+            nodes = _want_seq(diags, body.get("nodes"), f"{base}.body.nodes", "nodes")
+            if nodes is not None:
                 for i, item in enumerate(nodes.items):
                     npath = f"{base}.body.nodes[{i}]"
                     if not isinstance(item, YMap):

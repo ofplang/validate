@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.script
+notes: >
+  A `script` process declares `language` and `code` (spec 22).

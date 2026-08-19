@@ -1,0 +1,13 @@
+spec_version: "0.0"
+processes:
+  step: { kind: atomic, inputs: {}, outputs: { out: { type: Int, phase: data } } }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: { result: { type: Int, phase: data } }
+    body:
+      nodes:
+        - { id: s, process: step }
+      returns:
+        result: s.out
+entry: main

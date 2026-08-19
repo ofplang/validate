@@ -1,0 +1,9 @@
+spec_version: "0.0"
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+    contracts:
+      requires: oops
+entry: main

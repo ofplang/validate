@@ -1,0 +1,9 @@
+spec_version: "0.0"
+processes:
+  step: { kind: atomic, inputs: {}, outputs: {} }
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body: oops
+entry: main

@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body
+notes: >
+  A sequence is not a mapping either (spec 10.2); the earlier reading walked the
+  body's keys and simply found none.

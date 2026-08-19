@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body.returns
+notes: >
+  `body.returns` maps a boundary output name to its source entry (spec 12.3).

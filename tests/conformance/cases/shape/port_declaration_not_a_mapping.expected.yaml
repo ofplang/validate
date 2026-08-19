@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.inputs.x
+notes: >
+  A port declaration is a mapping carrying `type` and `phase` (spec 6), not the type
+  expression on its own.

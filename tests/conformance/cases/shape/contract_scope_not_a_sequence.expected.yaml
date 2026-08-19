@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.contracts.requires
+notes: >
+  A contract scope is a sequence of `{ expr: ... }` entries (spec 9.1).

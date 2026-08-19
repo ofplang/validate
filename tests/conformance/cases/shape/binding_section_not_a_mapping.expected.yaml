@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body.nodes[0].bind
+notes: >
+  A binding section maps a port name to a source entry (spec 2.6.6). Pure Data
+  bindings carry no Object consequence, so nothing downstream noticed this before.

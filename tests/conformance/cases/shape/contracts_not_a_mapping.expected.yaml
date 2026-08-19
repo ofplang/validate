@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.contracts
+notes: >
+  `contracts` holds `requires` / `ensures` (spec 9.1).

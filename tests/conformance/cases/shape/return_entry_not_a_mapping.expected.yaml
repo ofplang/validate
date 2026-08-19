@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body.returns.result
+notes: >
+  A return is a source entry -- `{ from: ... }` or `{ value: ... }` -- not the
+  reference on its own (spec 2.6.6, 12.3).

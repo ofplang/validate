@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: wrong_value_kind
+    path: processes.main.body.nodes
+notes: >
+  `body.nodes` is a sequence of node mappings (spec 10.2). A string is iterable, so
+  a reader that assumes a sequence sees a body of characters rather than nodes.
