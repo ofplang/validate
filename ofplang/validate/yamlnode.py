@@ -29,6 +29,10 @@ from pathlib import Path
 
 import yaml
 
+# The error-code catalog only defines names -- it imports nothing -- so referring to it
+# from the loader cannot cycle, and the codes raised here stop being loose strings.
+from ofplang.validate import errors
+
 # --- Resolved YAML 1.1 core tags we care about ----------------------------
 # We compare against these instead of constructing Python values so that the
 # original scalar kind (and thus v0's Data-type distinctions) is never lost.
@@ -228,7 +232,9 @@ def _convert(node, file: str | None) -> YNode:
         return YMap(tag=node.tag, pos=_pos(node.start_mark, file), entries=entries)
 
     # PyYAML only produces the three node kinds above.
-    raise YamlError("wrong_value_kind", f"unsupported YAML node: {type(node).__name__}")
+    raise YamlError(
+        errors.WRONG_VALUE_KIND, f"unsupported YAML node: {type(node).__name__}"
+    )
 
 
 def compose_document(text: str, file: str | None = None) -> YNode:
@@ -242,12 +248,14 @@ def compose_document(text: str, file: str | None = None) -> YNode:
         docs = list(yaml.compose_all(text, Loader=yaml.SafeLoader))
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
-        raise YamlError("wrong_value_kind", f"unparsable YAML: {exc}", _pos(mark, file)) from exc
+        raise YamlError(
+            errors.WRONG_VALUE_KIND, f"unparsable YAML: {exc}", _pos(mark, file)
+        ) from exc
 
     if len(docs) == 0:
         raise YamlError("wrong_value_kind", "empty YAML document")
     if len(docs) > 1:
-        raise YamlError("multidoc_import", "YAML stream contains more than one document")
+        raise YamlError(errors.MULTIDOC_IMPORT, "YAML stream contains more than one document")
 
     root = docs[0]
     if root is None:
@@ -266,7 +274,7 @@ def load_document(path: str | Path) -> YNode:
     try:
         text = p.read_text(encoding="utf-8")
     except OSError as exc:
-        raise YamlError("unreadable_import", f"cannot read {p}: {exc}") from exc
+        raise YamlError(errors.UNREADABLE_IMPORT, f"cannot read {p}: {exc}") from exc
     return compose_document(text, str(p))
 
 

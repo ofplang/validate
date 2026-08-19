@@ -170,7 +170,7 @@ def validate(
         views_pass.check_views(root, diags, env)
         phases_pass.check_phases(root, diags, env)
         features_pass.check_features(root, diags, mode)
-        objects_pass.check_objects(root, diags, env)
+        objects_pass.check_objects(root, diags, env, sigs)
         generics_pass.check_generics(root, diags, env)
         script_pass.check_scripts(root, diags, env)
         nodes_pass.check_nodes(root, diags, sigs)

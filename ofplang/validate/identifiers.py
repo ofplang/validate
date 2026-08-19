@@ -14,7 +14,7 @@ import re
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.yamlnode import YMap, YNode
+from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # The core identifier grammar (spec 2.4). Anchored so the whole name must match.
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -119,13 +119,11 @@ def check_identifiers(doc: YMap, diags: Diagnostics) -> None:
         body = proc.get("body")
         if isinstance(body, YMap):
             nodes = body.get("nodes")
-            from ofplang.validate.yamlnode import YSeq  # local import avoids cycle noise
 
             if isinstance(nodes, YSeq):
                 for i, item in enumerate(nodes.items):
                     if isinstance(item, YMap):
                         id_node = item.get("id")
-                        from ofplang.validate.yamlnode import YScalar
 
                         if isinstance(id_node, YScalar):
                             _check(diags, id_node.text, f"{base}.body.nodes[{i}].id", at=id_node)

@@ -319,8 +319,9 @@ def _check_branch(
     if isinstance(then_proc, YScalar) and then_proc.text in sigs:
         then_obj = _object_output_names(sigs[then_proc.text])
 
+    else_proc = else_arm.get("process") if isinstance(else_arm, YMap) else None
+
     if isinstance(else_arm, YMap):
-        else_proc = else_arm.get("process")
         else_obj: set[str] = set()
         if isinstance(else_proc, YScalar) and else_proc.text in sigs:
             else_obj = _object_output_names(sigs[else_proc.text])
@@ -402,11 +403,7 @@ def _check_branch(
     # An arm that creates/replaces the output (no map source), or maps it from a
     # different argument, makes the resulting identity arm-dependent.
     then_def = processes.get(then_proc.text) if isinstance(then_proc, YScalar) else None
-    else_def = (
-        processes.get(else_proc.text)
-        if isinstance(else_arm, YMap) and isinstance(else_proc := else_arm.get("process"), YScalar)
-        else None
-    )
+    else_def = processes.get(else_proc.text) if isinstance(else_proc, YScalar) else None
     if isinstance(then_def, YMap) and isinstance(else_def, YMap):
         then_src = _map_sources(then_def)
         else_src = _map_sources(else_def)

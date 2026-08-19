@@ -110,7 +110,9 @@ def _lex(s: str) -> list[Tok]:
         # A float must be tried before an int (it starts with digits too).
         if c.isdigit():
             mf = _FLOAT_RE.match(s, i)
-            if mf and mf.end() == _float_span_end(s, i, mf):
+            # The float pattern stops at a second dot on its own, so a `1.2.3`-style
+            # over-read cannot happen and the match end is authoritative.
+            if mf:
                 toks.append(Tok("num_float", mf.group()))
                 i = mf.end()
                 continue
@@ -140,13 +142,6 @@ def _lex(s: str) -> list[Tok]:
             continue
         raise ContractError(errors.CONTRACT_PARSE_ERROR, f"unexpected character {c!r}")
     return toks
-
-
-def _float_span_end(s: str, i: int, m: re.Match) -> int:
-    # Guard against `1.2.3`-style over-reads: the float regex already stops at
-    # the second dot, so the match end is authoritative; this hook exists to
-    # keep the numeric branch readable and future-proof.
-    return m.end()
 
 
 # --- AST ------------------------------------------------------------------

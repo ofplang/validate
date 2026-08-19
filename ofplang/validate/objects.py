@@ -560,11 +560,16 @@ def _check_composite(
             diags.add(errors.OBJECT_FANOUT, "Object-bearing value fans out", sources[src])
 
 
-def check_objects(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
+def check_objects(
+    doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, ProcSig] | None = None
+) -> None:
+    """`sigs` are the process signatures the validator already built for the other
+    graph-level passes; they are rebuilt here only when a caller does not have them."""
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
         return
-    sigs = build_signatures(doc, env)
+    if sigs is None:
+        sigs = build_signatures(doc, env)
     for pname in processes.keys():
         proc = processes.get(pname)
         if not isinstance(proc, YMap):
