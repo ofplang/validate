@@ -67,6 +67,20 @@ if not result.ok:
 validator collects all independent findings rather than stopping at the first;
 only a YAML parse or `$import` resolution failure is terminal.
 
+`source` is a path **or an already-loaded document** (a mapping), so a caller that
+builds one in memory — a generator, a notebook, a tool that rewrote a document
+before running it — can validate exactly what it holds:
+
+```python
+result = validate(document)          # the same checks, the same codes
+```
+
+An in-memory document must already be import-expanded (there is no base directory
+to resolve a relative `$import` against — call `expand()` on the file first), and it
+cannot contain a value v0 has no spelling for, such as a `datetime`; either raises
+`ValueError`. Its diagnostics carry no `file:line:col`, only `path`, and no
+`duplicate_key` can arise for it: a mapping holds one value per key.
+
 ### Expanded document
 
 `$import` (spec §3) is *structural* inclusion resolved before any other checks,

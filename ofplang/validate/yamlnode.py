@@ -17,6 +17,12 @@ violates, so we must load YAML *as a node tree* and inspect it ourselves:
   * Import targets must be single YAML documents (spec 3.4); ``compose_all``
     lets us count documents and reject multi-document streams.
 
+A tree can also be built from a document that is *already loaded* --
+:func:`from_object` -- for a caller that holds plain dicts rather than a file. Such
+a tree carries no source positions, and its scalars carry the tag their Python type
+implies, which is more faithful than re-serialising and re-reading: a string that
+happens to read like a number stays a string.
+
 The neutral node classes below (:class:`YScalar`, :class:`YSeq`, :class:`YMap`)
 decouple the rest of the validator from PyYAML's internal node API.
 """
@@ -60,10 +66,16 @@ class Pos:
 
 @dataclass
 class YNode:
-    """Base class carrying the resolved tag and source position."""
+    """Base class carrying the resolved tag and source position.
+
+    `pos` is None for a node built by :func:`from_object`: an already-loaded
+    document has no source to point at. Diagnostics degrade to their logical
+    `path` there, which is what the reporting layer already does when a pass
+    cannot supply a position.
+    """
 
     tag: str
-    pos: Pos
+    pos: Pos | None
 
 
 @dataclass
@@ -276,6 +288,77 @@ def load_document(path: str | Path) -> YNode:
     except OSError as exc:
         raise YamlError(errors.UNREADABLE_IMPORT, f"cannot read {p}: {exc}") from exc
     return compose_document(text, str(p))
+
+
+#: The tag a Python value of each exact type implies. `bool` is listed before `int`
+#: only for the reader: the lookup is by exact type, which is what keeps them apart.
+_VALUE_TAGS = {
+    bool: TAG_BOOL,
+    int: TAG_INT,
+    float: TAG_FLOAT,
+    str: TAG_STR,
+    type(None): TAG_NULL,
+}
+
+
+def _scalar_text(value: object) -> str:
+    """The YAML text a scalar would have been written as.
+
+    The text is what several checks read -- a float's finiteness, a type
+    expression, a contract body -- so it has to be the spelling YAML uses, not
+    Python's. The two differ exactly where it matters: booleans are lower case,
+    and a non-finite float is `.inf` / `-.inf` / `.nan` rather than `inf` / `nan`,
+    which is how the non-finite checks (spec 7.4, 23.4) recognise it.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return ".nan"
+        if value == float("inf"):
+            return ".inf"
+        if value == float("-inf"):
+            return "-.inf"
+        return repr(value)
+    return str(value)
+
+
+def from_object(data: object, path: str = "<root>") -> YNode:
+    """Wrap an already-loaded document (plain dicts / sequences / scalars).
+
+    The result carries no source positions (see :class:`YNode`). Mapping keys are
+    stringified, as a YAML load would have them; a `tuple` is a sequence, as
+    `yaml.safe_dump` would write it.
+
+    A value of a type v0 has no spelling for -- a `datetime`, a `set`, an object of
+    some class -- raises :class:`ValueError` naming where it sits. Coercing it to
+    text instead would be the kind of silent misreading this layer exists to
+    prevent: the caller would be told its document is valid while what was checked
+    is not what it wrote.
+    """
+    if isinstance(data, dict):
+        entries: list[tuple[YScalar, YNode]] = []
+        for key, value in data.items():
+            key_node = YScalar(tag=TAG_STR, pos=None, text=str(key))
+            entries.append((key_node, from_object(value, f"{path}.{key}")))
+        return YMap(tag="tag:yaml.org,2002:map", pos=None, entries=entries)
+
+    if isinstance(data, (list, tuple)):
+        return YSeq(
+            tag="tag:yaml.org,2002:seq",
+            pos=None,
+            items=[from_object(item, f"{path}[{i}]") for i, item in enumerate(data)],
+        )
+
+    tag = _VALUE_TAGS.get(type(data))
+    if tag is None:
+        raise ValueError(
+            f"{path}: a v0 document cannot hold a {type(data).__name__} "
+            "(expected a mapping, a sequence, a string, a number, a boolean, or null)"
+        )
+    return YScalar(tag=tag, pos=None, text=_scalar_text(data))
 
 
 def to_plain(node: YNode) -> object:

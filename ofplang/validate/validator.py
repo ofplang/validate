@@ -72,7 +72,7 @@ class ValidationResult:
 
 
 def validate(
-    source: str | Path,
+    source: str | Path | dict,
     *,
     mode: str = STRICT,
     base_dir: str | Path | None = None,
@@ -83,7 +83,13 @@ def validate(
     Parameters
     ----------
     source:
-        Path to the root YAML document.
+        Path to the root YAML document, or an already-loaded document (a mapping) --
+        for a caller that builds or holds one in memory and has no file to point at.
+        An in-memory document must already be import-expanded: there is no base
+        directory to resolve a relative ``$import`` against, so one raises
+        :class:`ValueError` (call :func:`expand` on the file first). Its diagnostics
+        carry no ``file:line:col``, only their logical ``path``, and it cannot carry a
+        duplicate mapping key at all, so ``duplicate_key`` never arises for it.
     mode:
         ``"strict"`` (portable v0) or ``"extension-tolerant"`` (accepts ``x-``
         extension keys/features/preference kinds).
@@ -124,7 +130,7 @@ def validate(
     from ofplang.validate.imports import load_expanded
     from ofplang.validate.objects import build_signatures
     from ofplang.validate.types import build_env
-    from ofplang.validate.yamlnode import YamlError, YMap, to_plain
+    from ofplang.validate.yamlnode import YamlError, YMap, from_object, to_plain
 
     if mode not in MODES:
         raise ValueError(f"unknown validation mode: {mode!r}")
@@ -135,12 +141,22 @@ def validate(
     # load failures and structural import failures are fatal — nothing can be
     # validated without a fully expanded tree — so they surface as the sole
     # diagnostic and stop (with `document` left None, since there is no tree).
-    try:
-        root = load_expanded(source, base_dir)
-    except YamlError as exc:
-        # Surface the failure's own position (file/line) when it has one.
-        diags.add(exc.code, exc.message, at=exc.pos)
-        return diags.result()
+    #
+    # An already-loaded document skips the load: there is nothing to parse, and
+    # nothing to expand either. A `$import` left in it is refused rather than
+    # reported, because the document is not at fault -- v0 allows imports; this
+    # entry point simply has no directory to resolve one against. That is a caller
+    # error, like an unknown `mode`, so it is raised the same way.
+    if isinstance(source, dict):
+        _refuse_unexpanded_imports(source)
+        root = from_object(source)
+    else:
+        try:
+            root = load_expanded(source, base_dir)
+        except YamlError as exc:
+            # Surface the failure's own position (file/line) when it has one.
+            diags.add(exc.code, exc.message, at=exc.pos)
+            return diags.result()
 
     # The expanded document is available now that load succeeded; capture it up
     # front (when requested) so it is returned even if later passes find errors.
@@ -186,6 +202,27 @@ def validate(
     result = diags.result()
     result.document = document  # type: ignore[assignment]  # dict for a valid v0 root
     return result
+
+
+def _refuse_unexpanded_imports(data: object, path: str = "<root>") -> None:
+    """Raise if an in-memory document still carries a `$import` anywhere.
+
+    Expansion needs a base directory to resolve a relative path against, and an
+    in-memory document has none. `expand()` (or `validate(path, expand=True)`) is
+    where a caller gets an expanded document to hand over.
+    """
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key == "$import":
+                raise ValueError(
+                    f"{path}.$import: an in-memory document must already be "
+                    "import-expanded (there is no base directory to resolve it "
+                    "against); expand the file first, e.g. expand(path)"
+                )
+            _refuse_unexpanded_imports(value, f"{path}.{key}")
+    elif isinstance(data, (list, tuple)):
+        for i, item in enumerate(data):
+            _refuse_unexpanded_imports(item, f"{path}[{i}]")
 
 
 def expand(source: str | Path, *, base_dir: str | Path | None = None) -> dict:
