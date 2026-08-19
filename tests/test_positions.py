@@ -26,6 +26,18 @@ def test_position_propagates_to_diagnostic() -> None:
     assert diag.location and ":" in diag.location
 
 
+def test_linearity_diagnostics_carry_a_position() -> None:
+    # These two were the only diagnostics reported with a path but no position, so a
+    # reader had to find the offending node themselves. `object_output_unused` points at
+    # the node that produced the value (the output port is declared on the target
+    # process, which is elsewhere); the composite-input case points at the declaration.
+    result = validate(str(CASES / "linearity" / "object_output_unused.yaml"))
+    diag = next(d for d in result.diagnostics if d.code == "object_output_unused")
+    assert diag.path == "processes.main.body.nodes.make.cup"
+    assert isinstance(diag.line, int) and diag.line >= 1
+    assert diag.file and diag.file.endswith("object_output_unused.yaml")
+
+
 def test_import_diagnostic_names_the_fragment(tmp_path: Path) -> None:
     # An error located inside an imported fragment must report the fragment
     # file, not the root — that is why positions carry a file.

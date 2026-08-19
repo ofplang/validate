@@ -520,10 +520,16 @@ def _check_composite(
     # composite's own Object inputs, plus each ordinary node's Object outputs.
     # (Structured node output shaping is handled in the node layer; those nodes
     # are skipped here so we do not misjudge their outdegree.)
-    sources: dict[tuple[str, str], str] = {}  # (owner, name) -> display path
+    # (owner, name) -> (display path, the node to point a diagnostic at). The node is
+    # what the reader has to go and change: the port declaration for a composite's own
+    # input, the producing node for a node output (the output itself is declared on the
+    # target process, which is elsewhere).
+    sources: dict[tuple[str, str], tuple[str, YNode | None]] = {}
+    declared_inputs = proc.get("inputs")
     for name, s in sig.inputs.items():
         if s.object_bearing:
-            sources[("inputs", name)] = f"{base}.inputs.{name}"
+            at = declared_inputs.get(name) if isinstance(declared_inputs, YMap) else None
+            sources[("inputs", name)] = (f"{base}.inputs.{name}", at)
 
     nodes = body.get("nodes")
     if isinstance(nodes, YSeq):
@@ -543,7 +549,10 @@ def _check_composite(
                 continue
             for oname, osig in target.outputs.items():
                 if osig.object_bearing:
-                    sources[(nid.text, oname)] = f"{base}.body.nodes.{nid.text}.{oname}"
+                    sources[(nid.text, oname)] = (
+                        f"{base}.body.nodes.{nid.text}.{oname}",
+                        nid,
+                    )
 
     # Count outdegree of each Object source. Linearity requires exactly one use
     # (spec 12.2): zero is an unused Object output, more than one is fan-out.
@@ -554,10 +563,11 @@ def _check_composite(
             counts[tgt] += 1
 
     for src, n in counts.items():
+        path, at = sources[src]
         if n == 0:
-            diags.add(errors.OBJECT_OUTPUT_UNUSED, "Object-bearing value is unused", sources[src])
+            diags.add(errors.OBJECT_OUTPUT_UNUSED, "Object-bearing value is unused", path, at=at)
         elif n > 1:
-            diags.add(errors.OBJECT_FANOUT, "Object-bearing value fans out", sources[src])
+            diags.add(errors.OBJECT_FANOUT, "Object-bearing value fans out", path, at=at)
 
 
 def check_objects(
