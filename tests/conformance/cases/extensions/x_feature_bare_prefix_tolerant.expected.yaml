@@ -1,0 +1,6 @@
+mode: extension-tolerant
+outcome: invalid
+errors:
+  - code: unknown_feature
+    path: "features[0]"
+notes: "The prefix alone is not an extension feature name: spec 26 requires a following identifier."

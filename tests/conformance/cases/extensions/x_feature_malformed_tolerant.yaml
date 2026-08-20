@@ -1,0 +1,9 @@
+spec_version: "0.0"
+features:
+  - x-vendor-feature
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

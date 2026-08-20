@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.identifiers import classify_name
 from ofplang.validate.validator import EXTENSION_TOLERANT
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
@@ -101,12 +102,24 @@ def check_features(doc: YMap, diags: Diagnostics, mode: str) -> None:
             continue
         name = item.text
         declared.add(name)
-        # Extension feature names (x-...) are allowed only in tolerant mode.
+        # Extension feature names (x-...) are allowed only in tolerant mode, and only
+        # in the form `x-` + an identifier (spec 26). A name that misses the form is
+        # not an extension feature name, so it falls under the same "unknown
+        # non-extension feature name" rule as `bogus_feature` -- the grammar comes
+        # from `identifiers` so there is one source for it (reserved words do not
+        # apply: spec 26 constrains the shape only).
         if name.startswith("x-"):
             if mode != EXTENSION_TOLERANT:
                 diags.add(
                     errors.UNKNOWN_FEATURE,
                     f"extension feature {name!r}",
+                    f"features[{i}]",
+                    at=item,
+                )
+            elif classify_name(name[len("x-") :], reserved=False) is not None:
+                diags.add(
+                    errors.UNKNOWN_FEATURE,
+                    f"malformed extension feature name {name!r}",
                     f"features[{i}]",
                     at=item,
                 )

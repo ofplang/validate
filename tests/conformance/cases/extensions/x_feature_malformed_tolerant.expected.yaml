@@ -1,0 +1,9 @@
+mode: extension-tolerant
+outcome: invalid
+errors:
+  - code: unknown_feature
+    path: "features[0]"
+notes: >-
+  An extension feature name must be `x-` followed by an identifier (spec 26); a
+  hyphen is not part of that grammar, so the name is an unknown feature name even
+  in extension-tolerant mode.
