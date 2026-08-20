@@ -1,0 +1,13 @@
+spec_version: "0.0"
+processes:
+  main:
+    kind: atomic
+    inputs:
+      x:
+        type: Int
+        phase: data
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.x.view > 1/(3 - 3)"
+entry: main

@@ -1,0 +1,4 @@
+outcome: valid
+notes: >-
+  A non-zero constant divisor is fine, and a divisor that reads a runtime view value
+  is a runtime concern, not a statically determinable error (spec 9.2).

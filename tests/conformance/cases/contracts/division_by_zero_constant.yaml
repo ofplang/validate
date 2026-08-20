@@ -1,0 +1,10 @@
+spec_version: "0.0"
+processes:
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "1/0 > 1"
+entry: main

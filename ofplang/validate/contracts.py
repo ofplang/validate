@@ -496,8 +496,31 @@ def _eval(node):
         if op == "*":
             return a * b
         if op == "/":
-            return a / b  # ZeroDivisionError caught by caller as a static error
+            return a / b  # a zero divisor was already reported (_check_constant_division)
     raise ContractError(errors.CONTRACT_TYPE_ERROR, "uncomputable constant")
+
+
+def _check_constant_division(node) -> None:
+    """Report division by zero in a constant subexpression (spec 9.2).
+
+    The constant fold in `_check_expr` only runs for a reference-free contract, so
+    on its own it never sees the `1/0` in `inputs.x.view > 1/0`. Spec 9.2 makes the
+    *subexpression* the unit ("division by zero in a constant subexpression") and
+    forbids letting a reference elsewhere in the expression excuse a statically
+    erroneous part of it, so every `/` with a reference-free divisor is checked here.
+
+    Operands are walked before the node itself, so the innermost error is the one
+    reported and the `_eval` below never meets a nested `/0` of its own.
+    """
+    if isinstance(node, Unary):
+        _check_constant_division(node.operand)
+    elif isinstance(node, Binary):
+        _check_constant_division(node.left)
+        _check_constant_division(node.right)
+        # `_type_of` has already accepted both operands as numeric, so a
+        # reference-free divisor evaluates to a number here.
+        if node.op == "/" and not _has_ref(node.right) and _eval(node.right) == 0:
+            raise ContractError(errors.CONTRACT_STATIC_FALSE, "static division by zero")
 
 
 def _check_expr(
@@ -510,19 +533,15 @@ def _check_expr(
         # bare reference through a type parameter that may yet be a Bool.
         if not _admits(result, {"Bool"}):
             raise ContractError(errors.CONTRACT_TYPE_ERROR, f"contract is {result}, not Bool")
-        # Constant folding: a contract with no runtime references that is
-        # statically false (or hits a static eval error like /0) is invalid at
-        # graph time (spec 9.2). Reference-bearing contracts are runtime checks.
-        if not _has_ref(ast):
-            try:
-                if _eval(ast) is False:
-                    raise ContractError(
-                        errors.CONTRACT_STATIC_FALSE, "contract is statically false"
-                    )
-            except ZeroDivisionError:
-                raise ContractError(
-                    errors.CONTRACT_STATIC_FALSE, "static division by zero"
-                ) from None
+        # A statically determinable evaluation error is a validation error whether or
+        # not the rest of the expression reads runtime values (spec 9.2), so this runs
+        # for every contract -- and it leaves the fold below no `/0` to trip over.
+        _check_constant_division(ast)
+        # Constant folding: a contract with no runtime references that is statically
+        # false is invalid at graph time (spec 9.2). Reference-bearing contracts are
+        # runtime checks.
+        if not _has_ref(ast) and _eval(ast) is False:
+            raise ContractError(errors.CONTRACT_STATIC_FALSE, "contract is statically false")
     except ContractError as exc:
         # Position points at the contract expression scalar (the whole line);
         # sub-token offsets within the expression are not tracked in v1.

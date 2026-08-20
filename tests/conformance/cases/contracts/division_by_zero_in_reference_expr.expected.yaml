@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: contract_static_false
+notes: >-
+  Division by zero in a constant subexpression is a validation error even when the
+  rest of the expression reads a runtime view value (spec 9.2).

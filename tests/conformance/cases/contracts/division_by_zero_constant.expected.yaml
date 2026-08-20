@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: contract_static_false
+notes: >-
+  A fully constant contract that divides by zero is reported as the static error, not
+  folded to false (spec 9.2).

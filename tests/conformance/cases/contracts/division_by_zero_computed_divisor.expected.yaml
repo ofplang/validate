@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+  - code: contract_static_false
+notes: >-
+  The divisor need not be a literal zero: a constant subexpression that evaluates to
+  zero is statically determinable (spec 9.2).
