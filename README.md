@@ -117,6 +117,12 @@ Covers graph-time validation of portable v0. Runtime failures, and run/data-phas
 preflight checks, are out of scope (spec §6.2, §25). Two modes are supported:
 `strict` (portable v0) and `extension-tolerant` (accepts `x-` extension keys).
 
+v0's seven optional features (spec §4.2) are all checked here, whichever ones the
+document uses. Whether anything can then *act* on the document is a separate
+question: a feature the validator checks may be one the scheduler or the runner
+does not implement — which §4.1 calls valid v0 but unsupported by that
+implementation. Their READMEs say which ones they support.
+
 ## Tests
 
 The behavior is pinned by a spec-derived conformance suite that matches on error
