@@ -48,8 +48,10 @@ Diagnostics carry a `file:line:col` source position (an imported fragment's own
 file when the problem is inside an `$import`); `--format json` includes
 `file`/`line`/`col` fields.
 
-This tool is also intended to be exposed as the `validate` subcommand of the
-umbrella `ofp` CLI (a separate repository in the `ofplang` organization).
+This tool is also the `validate` subcommand of the umbrella `ofp` CLI
+([`ofplang`](https://pypi.org/project/ofplang/)), which forwards to it in-process:
+`ofp validate doc.yaml` is the command above, with the same options and the same
+exit codes.
 
 ## Library
 
