@@ -5,7 +5,10 @@ each kind imposes extra well-formedness rules on top of the target's own Object
 tracking completeness. This pass checks the kind-specific structural rules:
 
   * `fold` / `do_while` carry bindings need a matching same-name output on the
-    target (structured carry compatibility, spec 16);
+    target, and an Object-bearing one must be threaded through it -- preserved,
+    or consumed and created (structured carry compatibility, spec 16);
+  * `map` and `fold` need at least one `each` source, which is what indexes
+    their shape (spec 1.1, 17, 18);
   * `do_while` requires an explicit `max_iterations` bound (spec 19); and
   * `branch` forbids one-sided Object-bearing outputs — an Object output must be
     common to both arms so its identity does not depend on the chosen arm
@@ -134,6 +137,75 @@ def _each_literal_lengths(node: YMap) -> tuple[list[int], bool]:
 def _carry_names(node: YMap) -> list[str]:
     carry = node.get("carry")
     return carry.keys() if isinstance(carry, YMap) else []
+
+
+def _check_each_present(diags: Diagnostics, node: YMap, nid: str, base: str) -> None:
+    """`map` and `fold` need a traversal length, and only `each` gives them one.
+
+    Their shape is the body L times, indexed by the common length of the `each`
+    sources (spec 1.1, 17, 18). With no source there is no L, so an absent
+    section and an empty one are the same error.
+    """
+    each = node.get("each")
+    if not isinstance(each, YMap) or not each.keys():
+        diags.add(
+            errors.MISSING_EACH_SOURCE,
+            "a map or fold node needs at least one each source",
+            f"{base}.nodes.{nid}",
+            at=node,
+        )
+
+
+def _object_fates(proc_def: YMap) -> tuple[dict[str, str], set[str], set[str]]:
+    """An atomic process's declared Object behavior: identity map sources, the
+    consumed input ports, and the created output ports."""
+    consumed: set[str] = set()
+    created: set[str] = set()
+    objects = proc_def.get("objects")
+    if isinstance(objects, YMap):
+        for section, out in (("consume", consumed), ("create", created)):
+            seq = objects.get(section)
+            if isinstance(seq, YSeq):
+                for item in seq.items:
+                    if isinstance(item, YScalar):
+                        parts = item.text.split(".")
+                        if len(parts) == 2:
+                            out.add(parts[1])
+    return _map_sources(proc_def), consumed, created
+
+
+def _check_carry_threading(
+    diags: Diagnostics, node: YMap, nid: str, target: ProcSig, proc_def: YNode | None, base: str
+) -> None:
+    """An Object-bearing carry must be threaded through the target (spec 16).
+
+    Either the carried input port's fate is the same-name output port, or that
+    input is consumed and that output created. A third arrangement -- the carried
+    Object leaving through a collected output while the carry output is created
+    -- balances, and Object tracking completeness therefore accepts it, but the
+    node's own Object correspondence would have to name a position within a
+    collection, which v0 cannot express.
+
+    Only a target whose Object behavior is declared directly can be answered
+    here. A composite derives it from its body graph, which is the skeleton
+    derivation, so its carry is left to that.
+    """
+    if not isinstance(proc_def, YMap) or target.kind != "atomic":
+        return
+    map_sources, consumed, created = _object_fates(proc_def)
+    for cname in _carry_names(node):
+        out_port = target.outputs.get(cname)
+        if out_port is None or not out_port.object_bearing:
+            continue
+        preserved = map_sources.get(cname) == cname
+        replaced = cname in consumed and cname in created
+        if not preserved and not replaced:
+            diags.add(
+                errors.CARRY_NOT_THREADED,
+                f"carry {cname!r} is neither preserved nor replaced by the target",
+                f"{base}.nodes.{nid}.carry.{cname}",
+                at=node,
+            )
 
 
 def _check_carry_compat(
@@ -464,11 +536,15 @@ def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None
             proc_ref = item.get("process")
             target = sigs.get(proc_ref.text) if isinstance(proc_ref, YScalar) else None
 
+            proc_def = processes.get(proc_ref.text) if isinstance(proc_ref, YScalar) else None
+
             if kind == "fold":
                 if target is not None:
                     _check_carry_compat(diags, item, nid, target, base)
+                    _check_carry_threading(diags, item, nid, target, proc_def, base)
                     _check_fold_outputs(diags, item, nid, target, base)
                 _check_zip(diags, item, nid, base)
+                _check_each_present(diags, item, nid, base)
             elif kind == "do_while":
                 # max_iterations is required (spec 19, requirement 5).
                 if item.get("max_iterations") is None:
@@ -480,11 +556,13 @@ def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None
                     )
                 if target is not None:
                     _check_carry_compat(diags, item, nid, target, base)
+                    _check_carry_threading(diags, item, nid, target, proc_def, base)
                     _check_do_while_outputs(diags, item, nid, target, base)
             elif kind == "branch":
                 _check_branch(diags, item, nid, sigs, processes, base)
             elif kind == "map":
                 # map uses zip-equal over its each sources (spec 17).
                 _check_zip(diags, item, nid, base)
+                _check_each_present(diags, item, nid, base)
             # `map` has no carry/condition; its feature requirement is derived in
             # the feature pass and its Object flow by the target's completeness.

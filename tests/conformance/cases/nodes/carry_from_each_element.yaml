@@ -1,0 +1,85 @@
+spec_version: "0.0"
+features:
+  - node_fold
+types:
+  Cup:
+    domain: object
+processes:
+  swap:
+    kind: atomic
+    inputs:
+      w:
+        type: Cup
+        phase: data
+      x:
+        type: Cup
+        phase: data
+    outputs:
+      w:
+        type: Cup
+        phase: data
+      spent:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.w: inputs.x
+        outputs.spent: inputs.w
+  cup_use:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cup
+  cups_use:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cups
+  main:
+    kind: composite
+    inputs:
+      xs:
+        type: Array<Cup>
+        phase: data
+      w0:
+        type: Cup
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: f
+          kind: fold
+          process: swap
+          carry:
+            w:
+              from: inputs.w0
+          each:
+            x:
+              from: inputs.xs
+          outputs:
+            w:
+              mode: carry
+            spent:
+              mode: collect
+        - id: u1
+          process: cup_use
+          state:
+            cup:
+              from: f.w
+        - id: u2
+          process: cups_use
+          state:
+            cups:
+              from: f.spent
+      returns: {}
+entry: main

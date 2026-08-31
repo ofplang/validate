@@ -1,0 +1,81 @@
+spec_version: "0.0"
+features:
+  - node_branch
+types:
+  Cup:
+    domain: object
+processes:
+  arm_a:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+      extra:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  arm_b:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  cup_use:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cup
+  main:
+    kind: composite
+    inputs:
+      flag:
+        type: Bool
+        phase: data
+      cup:
+        type: Cup
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: b
+          kind: branch
+          condition:
+            from: inputs.flag
+          args:
+            cup:
+              from: inputs.cup
+            extra:
+              value: 7
+          then:
+            process: arm_a
+          else:
+            process: arm_b
+          outputs:
+            cup:
+              mode: common
+        - id: u
+          process: cup_use
+          state:
+            cup:
+              from: b.cup
+      returns: {}
+entry: main

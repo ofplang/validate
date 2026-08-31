@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: data_indegree
+    path: "processes.main.body.nodes.mk.label"
+notes: >-
+  Every input port of the target is bound exactly once, across the binding
+  sections the node kind allows (spec 11). The rule reaches a structured node's
+  each and bind, not only an ordinary node's state and bind.

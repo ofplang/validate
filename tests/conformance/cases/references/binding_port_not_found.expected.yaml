@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: binding_port_not_found
+    path: "processes.main.body.nodes.s.bind.nosuch"
+notes: >-
+  The correspondence between a node's binding entries and its target's input
+  ports runs both ways (spec 11): an entry that names no input port is as much
+  an error as a port nothing binds.

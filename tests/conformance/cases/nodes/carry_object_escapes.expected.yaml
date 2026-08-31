@@ -1,0 +1,10 @@
+outcome: invalid
+errors:
+  - code: carry_not_threaded
+    path: "processes.main.body.nodes.f.carry.w"
+notes: >-
+  The carried Object leaves through the collected output while the carry output
+  is created fresh. Object tracking completeness accepts it -- the count
+  balances -- but the node's Object correspondence would have to say the carried
+  input arrives at the first collected element, which v0 cannot express
+  (spec 16, 2.6.2, 1.1).

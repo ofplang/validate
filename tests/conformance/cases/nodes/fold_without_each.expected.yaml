@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: missing_each_source
+    path: "processes.main.body.nodes.f"
+notes: >-
+  A fold has the same traversal length as a map and needs an each source for the
+  same reason (spec 18 requirement 3). A carry alone does not bound the loop.

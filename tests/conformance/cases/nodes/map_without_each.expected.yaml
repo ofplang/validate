@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: missing_each_source
+    path: "processes.main.body.nodes.mk"
+notes: >-
+  A map is its body L times, and L is the common length of the each sources
+  (spec 1.1, 17). With none there is no L and nothing says how many invocations
+  to perform.

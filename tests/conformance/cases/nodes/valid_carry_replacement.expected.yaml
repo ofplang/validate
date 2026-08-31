@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  The second form section 16 permits: the carry transition consumes the carried
+  input and creates the same-name output. The intermediate Objects are created
+  and consumed within the node, so the accounting closes there.

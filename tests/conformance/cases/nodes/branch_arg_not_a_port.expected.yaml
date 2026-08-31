@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: binding_port_not_found
+    path: "processes.main.body.nodes.b.args.extra"
+notes: >-
+  The correspondence holds against each arm (spec 11, 20). arm_b declares no
+  'extra' port, so the two arms do not agree on their input ports and the
+  argument has nowhere to go when that arm is selected.

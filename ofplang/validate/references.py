@@ -58,6 +58,91 @@ def _node_output_names(node: YMap, sigs: dict[str, ProcSig]) -> set[str]:
     return set()
 
 
+# The binding sections that supply a target's input ports, per node kind
+# (spec 11, 21.0). `None` is an ordinary node. Sections outside a kind's set are
+# reported by the shape pass, so a stray one here simply supplies nothing.
+_INPUT_SECTIONS: dict[str | None, tuple[str, ...]] = {
+    None: ("state", "bind"),
+    "map": ("each", "bind"),
+    "fold": ("each", "carry", "bind"),
+    "do_while": ("carry", "bind"),
+    "branch": ("args",),
+}
+
+
+def _targets_of(
+    node: YMap, kind: str | None, target: ProcSig | None, sigs: dict[str, ProcSig]
+) -> list[tuple[str, ProcSig]]:
+    """The processes a node invokes, each with a label for diagnostics.
+
+    A `branch` invokes one process per arm and binds both through one `args`
+    section, so the correspondence is answered per arm. An omitted `else` is an
+    implicit identity arm with no ports of its own (spec 20.3), so it names no
+    target here.
+    """
+    if kind == "branch":
+        out = []
+        for arm in ("then", "else"):
+            arm_node = node.get(arm)
+            if not isinstance(arm_node, YMap):
+                continue
+            proc = arm_node.get("process")
+            if isinstance(proc, YScalar) and proc.text in sigs:
+                out.append((arm, sigs[proc.text]))
+        return out
+    return [("", target)] if target is not None else []
+
+
+def _check_binding_correspondence(
+    diags: Diagnostics,
+    node: YMap,
+    nid: str,
+    arm: str,
+    target: ProcSig,
+    npath: str,
+    kind: str | None,
+) -> None:
+    """One node's bindings against one target's input ports, both directions."""
+    sections = _INPUT_SECTIONS.get(kind, ())
+    where = f" of the {arm} arm" if arm else ""
+
+    for iname, isig in target.inputs.items():
+        count = 0
+        for section in sections:
+            bound = node.get(section)
+            if isinstance(bound, YMap) and iname in bound.keys():
+                count += 1
+        if count == 1:
+            continue
+        if count == 0:
+            code = (
+                errors.OBJECT_INPUT_NO_SOURCE if isig.object_bearing else errors.DATA_INDEGREE
+            )
+            message = f"input {iname!r}{where} has no source"
+        else:
+            code = (
+                errors.OBJECT_INPUT_MULTI_SOURCE
+                if isig.object_bearing
+                else errors.DATA_INDEGREE
+            )
+            message = f"input {iname!r}{where} has multiple sources"
+        diags.add(code, message, f"{npath}.{iname}", at=node)
+
+    # The other direction: an entry that names no input port of this target.
+    for section in sections:
+        m = node.get(section)
+        if not isinstance(m, YMap):
+            continue
+        for portname in m.keys():
+            if portname not in target.inputs:
+                diags.add(
+                    errors.BINDING_PORT_NOT_FOUND,
+                    f"{section} {portname!r} names no input port{where}",
+                    f"{npath}.{section}.{portname}",
+                    at=m.key_node(portname),
+                )
+
+
 def _parse_ref(text: str) -> tuple[str, str] | None:
     parts = text.split(".")
     return (parts[0], parts[1]) if len(parts) == 2 else None
@@ -240,39 +325,16 @@ def _check_composite(
                             at=frm,
                         )
 
-        # Node input indegree, ordinary nodes only: every target input port must
-        # be bound exactly once via state (Object) or bind (Pure Data).
-        if kind is None and target is not None:
-            for iname, isig in target.inputs.items():
-                count = 0
-                for section in ("state", "bind"):
-                    m = node.get(section)
-                    if isinstance(m, YMap) and iname in m.keys():
-                        count += 1
-                if count == 0:
-                    code = (
-                        errors.OBJECT_INPUT_NO_SOURCE
-                        if isig.object_bearing
-                        else errors.DATA_INDEGREE
-                    )
-                    diags.add(
-                        code,
-                        f"input {iname!r} has no source",
-                        f"{base}.nodes.{nid}.{iname}",
-                        at=node,
-                    )
-                elif count > 1:
-                    code = (
-                        errors.OBJECT_INPUT_MULTI_SOURCE
-                        if isig.object_bearing
-                        else errors.DATA_INDEGREE
-                    )
-                    diags.add(
-                        code,
-                        f"input {iname!r} has multiple sources",
-                        f"{base}.nodes.{nid}.{iname}",
-                        at=node,
-                    )
+        # A node's binding entries and its target's input ports are in one-to-one
+        # correspondence (spec 11), whatever the node kind: every input port is
+        # bound exactly once across the sections the kind allows, and every entry
+        # names an input port. v0 gives an input port no default, so nothing is
+        # exempt. A `branch` has two targets and one `args` section, so the
+        # correspondence is checked against each arm.
+        for arm, arm_target in _targets_of(node, kind, target, sigs):
+            _check_binding_correspondence(
+                diags, node, nid, arm, arm_target, f"{base}.nodes.{nid}", kind
+            )
 
     # returns entries are body dataflow references too.
     returns = body.get("returns")

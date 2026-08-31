@@ -1,0 +1,39 @@
+spec_version: "0.0"
+features:
+  - node_fold
+processes:
+  step:
+    kind: atomic
+    inputs:
+      acc:
+        type: Int
+        phase: data
+    outputs:
+      acc:
+        type: Int
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      seed:
+        type: Int
+        phase: data
+    outputs:
+      acc:
+        type: Int
+        phase: data
+    body:
+      nodes:
+        - id: f
+          kind: fold
+          process: step
+          carry:
+            acc:
+              from: inputs.seed
+          outputs:
+            acc:
+              mode: carry
+      returns:
+        acc:
+          from: f.acc
+entry: main

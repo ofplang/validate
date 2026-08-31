@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: carry_not_threaded
+    path: "processes.main.body.nodes.f.carry.w"
+notes: >-
+  The mirror case: the carry output comes from an each element and the carried
+  input leaves through the collected output. The node's Object correspondence
+  would have to name the last element traversed (spec 16).

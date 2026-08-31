@@ -129,6 +129,15 @@ CARRY_OUTPUT_MISSING = "carry_output_missing"
 CARRY_TYPE_MISMATCH = "carry_type_mismatch"
 CARRY_PHASE_MISMATCH = "carry_phase_mismatch"
 CARRY_OUTPUT_NOT_CARRY_MODE = "carry_output_not_carry_mode"
+# An Object-bearing carry whose target relates the carried input port to the
+# same-name output port in neither of the two ways spec 16 permits. Balanced
+# Object accounting is not enough: the node's own Object correspondence would
+# have to name a position within a collection, which v0 cannot express.
+CARRY_NOT_THREADED = "carry_not_threaded"
+# `map` / `fold` with no `each` source (spec 17, 18). Their shape is the body L
+# times and L is the common length of the each sources, so there is no L to
+# index it by. An absent `each` and an empty one are the same error.
+MISSING_EACH_SOURCE = "missing_each_source"
 ONE_SIDED_OBJECT_OUTPUT = "one_sided_object_output"
 BRANCH_NOT_IDENTITY_EQUIVALENT = "branch_not_identity_equivalent"
 BRANCH_COMMON_TYPE_MISMATCH = "branch_common_type_mismatch"
@@ -173,6 +182,12 @@ RECURSIVE_PROCESS_DEPENDENCY = "recursive_process_dependency"
 MALFORMED_REFERENCE = "malformed_reference"
 UNKNOWN_REFERENCE = "unknown_reference"
 BINDING_SOURCE_ARITY = "binding_source_arity"
+# The other direction of the degree rules: a binding entry that names no input
+# port of the target process (spec 11). `data_indegree` and the Object input
+# codes report a port nothing binds; this reports a binding with no port. For a
+# `branch` the correspondence holds against each arm, so an argument naming a
+# port only one arm declares is reported here.
+BINDING_PORT_NOT_FOUND = "binding_port_not_found"
 
 # --- Binding type compatibility (spec 11.1) -------------------------------
 # A bound value's resolved type must match the port it is bound to. The three

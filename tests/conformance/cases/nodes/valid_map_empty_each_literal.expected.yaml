@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  An each source of length zero is still an each source: the node performs zero
+  invocations and collects empty outputs (spec 17). What 17 forbids is having no
+  each source at all, which leaves the traversal length undetermined.
