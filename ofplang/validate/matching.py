@@ -25,7 +25,11 @@ from __future__ import annotations
 import re
 from enum import Enum
 
-from ofplang.validate.objects import ProcSig
+from ofplang.validate.objects import (
+    EXPOSED_ARRAY,
+    ProcSig,
+    structured_exposed_port,
+)
 from ofplang.validate.types import (
     PRIMITIVE_TYPES,
     ArrayT,
@@ -191,56 +195,18 @@ def structured_output_type(
 
     A structured node reshapes its target's outputs, so what a downstream binding sees
     is not the target's declared type: `map` collects every output into an Array, and
-    `fold` / `do_while` shape each one by its mode. `drop` -- and a non-carry output
-    under an omitted `outputs` section, which is dropped by default (spec 18.3, 19.2)
-    -- expose nothing, so there is no type to match against.
+    `fold` / `do_while` shape each one by its mode. Which outputs are exposed, and
+    which of those are collected, is `structured_exposed_port` -- the same answer the
+    linearity pass reads to decide what has an outdegree, so a mode cannot mean one
+    thing to the type layer and another to Object tracking.
     """
-    kind = _text_of(node.get("kind"))
-
-    if kind == "branch":
-        # A branch exposes an output common to both arms, with the same type in each
-        # (spec 20.1 rule 4, pinned by the node pass), so either arm's declaration
-        # types it. With `outputs` omitted only Object-bearing commons are exposed
-        # and Data outputs are dropped (spec 20.3).
-        then_sig = arm_sig(node, "then", sigs)
-        port = then_sig.outputs.get(name) if then_sig is not None else None
-        if port is None:
-            return None
-        outputs = node.get("outputs")
-        if isinstance(outputs, YMap):
-            return port.type_expr if _mode_of(outputs.get(name)) == "common" else None
-        return port.type_expr if port.object_bearing else None
-
-    proc = _text_of(node.get("process"))
-    target = sigs.get(proc) if proc is not None else None
-    port = target.outputs.get(name) if target is not None else None
-    if port is None or port.type_expr is None:
+    exposed = structured_exposed_port(node, name, sigs)
+    if exposed is None:
         return None
-
-    if kind == "map":
-        # Every target output p: T is collected as Array<T>; v0 defines no
-        # `map.outputs` to shape it with (spec 17, 21).
-        return ArrayT(port.type_expr)
-
-    if kind not in ("fold", "do_while"):
+    exposure, port = exposed
+    if port.type_expr is None:
         return None
-
-    outputs = node.get("outputs")
-    if isinstance(outputs, YMap):
-        mode = _mode_of(outputs.get(name))
-    else:
-        # Defaults: carry outputs are exposed as carry, everything else is dropped
-        # (spec 18.3, 19.2).
-        carry = node.get("carry")
-        mode = "carry" if isinstance(carry, YMap) and name in carry.keys() else None
-
-    if mode == "collect":
-        return ArrayT(port.type_expr)
-    if mode in ("carry", "last"):
-        # A carry output is the threaded value itself, which spec 16 requires to be
-        # the same type as the carried port; `last` is one per-invocation value.
-        return port.type_expr
-    return None  # drop, unlisted, or an unrecognised mode: nothing is exposed
+    return ArrayT(port.type_expr) if exposure == EXPOSED_ARRAY else port.type_expr
 
 
 def source_type(

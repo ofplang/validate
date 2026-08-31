@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: object_output_unused
+    path: "processes.main.body.nodes.mk.cup"
+notes: >-
+  Spec 12.2 forbids an unconnected Object-bearing output port. The Objects the
+  map node created would disappear with no declared fate.

@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  Every Object-bearing output a structured node exposes -- a map collection, a
+  fold carry, a branch common output -- is connected exactly once, and the
+  dropped Pure Data output exposes nothing to connect.

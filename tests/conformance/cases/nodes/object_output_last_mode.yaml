@@ -18,6 +18,16 @@ processes:
     objects:
       create:
         - outputs.cup
+  use_cup:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cup
   main:
     kind: composite
     inputs:
@@ -35,5 +45,10 @@ processes:
           outputs:
             cup:
               mode: last
+        - id: use
+          process: use_cup
+          state:
+            cup:
+              from: loop.cup
       returns: {}
 entry: main

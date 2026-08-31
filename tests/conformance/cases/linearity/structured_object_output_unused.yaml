@@ -1,0 +1,35 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  cup_make:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      create:
+        - outputs.cup
+  main:
+    kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: mk
+          kind: map
+          process: cup_make
+          each:
+            n:
+              from: inputs.ns
+      returns: {}
+entry: main

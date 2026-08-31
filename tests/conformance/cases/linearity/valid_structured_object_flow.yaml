@@ -1,0 +1,140 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  cup_make:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      create:
+        - outputs.cup
+  cup_step:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+      x:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+      note:
+        type: String
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  cup_inspect:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  cups_use:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cups
+  cup_use:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cup
+  main:
+    kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
+      xs:
+        type: Array<Int>
+        phase: data
+      flag:
+        type: Bool
+        phase: data
+      cup_a:
+        type: Cup
+        phase: data
+      cup_b:
+        type: Cup
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: mk
+          kind: map
+          process: cup_make
+          each:
+            n:
+              from: inputs.ns
+        - id: acc
+          kind: fold
+          process: cup_step
+          carry:
+            cup:
+              from: inputs.cup_a
+          each:
+            x:
+              from: inputs.xs
+          outputs:
+            cup:
+              mode: carry
+            note:
+              mode: drop
+        - id: pick
+          kind: branch
+          condition:
+            from: inputs.flag
+          args:
+            cup:
+              from: inputs.cup_b
+          then:
+            process: cup_inspect
+          outputs:
+            cup:
+              mode: common
+        - id: use_mk
+          process: cups_use
+          state:
+            cups:
+              from: mk.cup
+        - id: use_acc
+          process: cup_use
+          state:
+            cup:
+              from: acc.cup
+        - id: use_pick
+          process: cup_use
+          state:
+            cup:
+              from: pick.cup
+      returns: {}
+entry: main

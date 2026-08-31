@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: object_fanout
+    path: "processes.main.body.nodes.mk.cup"
+notes: >-
+  A map node's exposed Object-bearing output is an Object-bearing output port,
+  so it has outdegree 1 (spec 12.2). Referencing it twice duplicates every
+  Object the map collected.

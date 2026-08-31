@@ -14,6 +14,13 @@ processes:
     objects:
       consume: [inputs.cup]
       create: [outputs.cup]
+  use_cup:
+    kind: atomic
+    inputs:
+      cup: { type: Cup, phase: data }
+    outputs: {}
+    objects:
+      consume: [inputs.cup]
   main:
     kind: composite
     inputs:
@@ -29,5 +36,9 @@ processes:
             cup: { from: inputs.cup }
           then:
             process: remake
+        - id: use
+          process: use_cup
+          state:
+            cup: { from: pick.cup }
       returns: {}
 entry: main

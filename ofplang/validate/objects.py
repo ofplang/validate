@@ -11,6 +11,11 @@ are never implicitly created, lost, duplicated, or discarded. Two mechanisms:
     Object-bearing value must flow to exactly one consumer (outdegree 1), which
     is the linearity rule (spec 12.2).
 
+An Object-bearing output port here is an ordinary node's output or a structured
+node's *exposed* output; which outputs a structured node exposes is
+:func:`structured_exposed_port`, shared with the type layer so the two cannot
+disagree about what a mode exposes.
+
 Granularity note: v0 defines fate/provenance at the *Object slot* level. This
 implementation currently accounts at *port* level, which is exact for scalar
 Object ports and whole-container transforms (the shapes v0 workflows use in
@@ -445,6 +450,135 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             )
 
 
+# --- Structured node output exposure (spec 17-21) --------------------------
+# How a structured node reshapes the target output it exposes: as the target's
+# own type, or collected into an Array. Two questions read this table -- what
+# type a downstream binding sees (the matching layer) and whether the exposed
+# value is an Object-bearing output port that linearity governs (below) -- so
+# the rule lives in one place and both ask it the same way.
+EXPOSED_ELEMENT = "element"
+EXPOSED_ARRAY = "array"
+
+
+def _text_of(node: YNode | None) -> str | None:
+    return node.text if isinstance(node, YScalar) else None
+
+
+def _output_mode(outputs: YNode | None, name: str) -> str | None:
+    """The `mode` an `outputs` section gives port `name` (spec 21)."""
+    if not isinstance(outputs, YMap):
+        return None
+    entry = outputs.get(name)
+    return _text_of(entry.get("mode")) if isinstance(entry, YMap) else None
+
+
+def _arm_target(node: YMap, arm: str, sigs: dict[str, ProcSig]) -> ProcSig | None:
+    proc = node.get(arm)
+    name = _text_of(proc.get("process")) if isinstance(proc, YMap) else None
+    return sigs.get(name) if name is not None else None
+
+
+def _branch_common(node: YMap, name: str, port: PortSig, sigs: dict[str, ProcSig]) -> bool:
+    """Whether both arms declare output `name` -- a branch exposes only a *common*
+    output (spec 20.1), so a one-sided one is not a value downstream at all. That it
+    is one-sided is reported by the node pass; treating it as exposed here would only
+    add a second complaint about the same mistake.
+
+    An arm that does not resolve to a process is left as common: the arm itself is
+    what is wrong, and hiding the output would suppress the checks that say so.
+    """
+    else_arm = node.get("else")
+    if isinstance(else_arm, YMap):
+        else_target = _arm_target(node, "else", sigs)
+        return else_target is None or name in else_target.outputs
+    # An omitted `else` is an implicit identity arm: it re-exposes each
+    # Object-bearing branch argument as a same-name output, and nothing else
+    # (spec 20.3).
+    args = node.get("args")
+    return port.object_bearing and isinstance(args, YMap) and name in args.keys()
+
+
+def structured_exposed_port(
+    node: YMap, name: str, sigs: dict[str, ProcSig]
+) -> tuple[str, PortSig] | None:
+    """How a structured node exposes its target's output `name`, and that port.
+
+    ``None`` means the output is exposed as nothing at all: it is dropped, it is
+    unlisted under an omitted `outputs` section (spec 18.3, 19.2, 20.3), or the
+    target does not declare it. There is then no value downstream, so neither a
+    type nor an outdegree applies to it.
+    """
+    kind = _text_of(node.get("kind"))
+    outputs = node.get("outputs")
+
+    if kind == "branch":
+        # Both arms declare the output with the same type (spec 20.1 rule 4,
+        # pinned by the node pass), so the `then` arm's declaration stands for
+        # it. With `outputs` omitted only the Object-bearing commons are
+        # exposed; Data outputs are dropped (spec 20.3).
+        target = _arm_target(node, "then", sigs)
+        port = target.outputs.get(name) if target is not None else None
+        if port is None or not _branch_common(node, name, port, sigs):
+            return None
+        if isinstance(outputs, YMap):
+            exposed = _output_mode(outputs, name) == "common"
+        else:
+            exposed = port.object_bearing
+        return (EXPOSED_ELEMENT, port) if exposed else None
+
+    target = sigs.get(_text_of(node.get("process")) or "")
+    port = target.outputs.get(name) if target is not None else None
+    if port is None:
+        return None
+
+    if kind == "map":
+        # Every target output p: T is collected as Array<T>; v0 defines no
+        # `map.outputs` to shape it with (spec 17, 21).
+        return (EXPOSED_ARRAY, port)
+
+    if kind not in ("fold", "do_while"):
+        return None
+
+    if isinstance(outputs, YMap):
+        mode = _output_mode(outputs, name)
+    else:
+        # Defaults: carry outputs are exposed as carry, everything else is
+        # dropped (spec 18.3, 19.2).
+        carry = node.get("carry")
+        mode = "carry" if isinstance(carry, YMap) and name in carry.keys() else None
+
+    if mode == "collect":
+        return (EXPOSED_ARRAY, port)
+    if mode in ("carry", "last"):
+        # A carry output is the threaded value itself, which spec 16 requires to
+        # be the carried port's type; `last` is one per-invocation value.
+        return (EXPOSED_ELEMENT, port)
+    return None
+
+
+def _exposed_object_outputs(node: YMap, sigs: dict[str, ProcSig]) -> list[str]:
+    """The names of the Object-bearing output ports a structured node exposes.
+
+    An Object-bearing output a node exposes *nothing* for is not silently lost:
+    the node pass reports it where the kind forbids it (spec 18.3, 19.1, 20.1),
+    which is a different mistake from an exposed output nobody connects.
+    """
+    kind = _text_of(node.get("kind"))
+    target = (
+        _arm_target(node, "then", sigs)
+        if kind == "branch"
+        else sigs.get(_text_of(node.get("process")) or "")
+    )
+    if target is None:
+        return []
+    names = []
+    for name in target.outputs:
+        exposed = structured_exposed_port(node, name, sigs)
+        if exposed is not None and exposed[1].object_bearing:
+            names.append(name)
+    return names
+
+
 # --- Composite linearity ---------------------------------------------------
 def _ref_target(text: str) -> tuple[str, str] | None:
     """Parse a body dataflow reference 'inputs.X' or 'node.output' (spec 2.6.1)."""
@@ -517,9 +651,10 @@ def _check_composite(
         return
 
     # Enumerate Object-bearing value sources available in this body: the
-    # composite's own Object inputs, plus each ordinary node's Object outputs.
-    # (Structured node output shaping is handled in the node layer; those nodes
-    # are skipped here so we do not misjudge their outdegree.)
+    # composite's own Object inputs, plus every node's Object outputs. A
+    # structured node contributes the outputs it *exposes*, reshaped by its mode
+    # (spec 12.2 lists such an output as a connection target in its own right);
+    # what it exposes nothing for is not a value here at all.
     # (owner, name) -> (display path, the node to point a diagnostic at). The node is
     # what the reader has to go and change: the port declaration for a composite's own
     # input, the producing node for a node output (the output itself is declared on the
@@ -539,20 +674,23 @@ def _check_composite(
             nid = item.get("id")
             proc_ref = item.get("process")
             kind = item.get("kind")
-            if not isinstance(nid, YScalar) or not isinstance(proc_ref, YScalar):
+            if not isinstance(nid, YScalar):
                 continue
-            # Only ordinary (unkinded) nodes have plain target-output typing.
             if kind is not None:
+                # A structured node reshapes its target's outputs, so which of
+                # them are Object-bearing values here follows from the exposure.
+                onames = _exposed_object_outputs(item, sigs)
+            elif isinstance(proc_ref, YScalar) and proc_ref.text in sigs:
+                onames = [
+                    n for n, s in sigs[proc_ref.text].outputs.items() if s.object_bearing
+                ]
+            else:
                 continue
-            target = sigs.get(proc_ref.text)
-            if target is None:
-                continue
-            for oname, osig in target.outputs.items():
-                if osig.object_bearing:
-                    sources[(nid.text, oname)] = (
-                        f"{base}.body.nodes.{nid.text}.{oname}",
-                        nid,
-                    )
+            for oname in onames:
+                sources[(nid.text, oname)] = (
+                    f"{base}.body.nodes.{nid.text}.{oname}",
+                    nid,
+                )
 
     # Count outdegree of each Object source. Linearity requires exactly one use
     # (spec 12.2): zero is an unused Object output, more than one is fan-out.

@@ -1,11 +1,13 @@
 spec_version: "0.0"
-features: []
+types:
+  Cup:
+    domain: object
 processes:
   cup_make:
     kind: atomic
     inputs:
-      label:
-        type: String
+      n:
+        type: Int
         phase: data
     outputs:
       cup:
@@ -26,25 +28,28 @@ processes:
         - inputs.cups
   main:
     kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
+    outputs: {}
     body:
       nodes:
-        - id: make
+        - id: mk
           kind: map
           process: cup_make
           each:
-            label:
-              from: inputs.labels
-        - id: use
+            n:
+              from: inputs.ns
+        - id: use_a
           process: cups_use
           state:
             cups:
-              from: make.cup
+              from: mk.cup
+        - id: use_b
+          process: cups_use
+          state:
+            cups:
+              from: mk.cup
       returns: {}
-    inputs:
-      labels:
-        type: Array<String>
-        phase: data
-types:
-  Cup:
-    domain: object
 entry: main

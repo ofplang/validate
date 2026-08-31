@@ -23,6 +23,14 @@ processes:
     objects:
       map:
         outputs.result: inputs.s
+  use_sample:
+    kind: atomic
+    inputs:
+      s: {type: Sample, phase: data}
+    outputs: {}
+    objects:
+      consume:
+        - inputs.s
   main:
     kind: composite
     inputs:
@@ -40,5 +48,9 @@ processes:
             process: arm_a
           else:
             process: arm_b
+        - id: use
+          process: use_sample
+          state:
+            s: {from: pick.result}
       returns: {}
 entry: main
