@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  The split size is an ordinary Pure Data input port and the relation between
+  the lengths is stated in contracts; neither appears in objects.transform
+  (spec 14.4.3).

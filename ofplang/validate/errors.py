@@ -138,11 +138,6 @@ OBJECT_OUTPUT_BAD_MODE = "object_output_bad_mode"
 NONCARRY_OBJECT_OUTPUT_UNLISTED = "noncarry_object_output_unlisted"
 LAST_ON_EMPTY_FOLD = "last_on_empty_fold"
 ZIP_MISMATCH = "zip_mismatch"
-# A spec §4.4 / §14.4.2 graph-phase error (array_uncons on an Array known empty
-# at graph phase). Kept as a defined code, but not currently emitted: at this
-# pass's port-level granularity an input Array's emptiness is not known at graph
-# phase, so the condition is left to the run/data phases.
-ARRAY_UNCONS_EMPTY = "array_uncons_empty"
 MISSING_MAX_ITERATIONS = "missing_max_iterations"
 BAD_CONDITION_OUTPUT = "bad_condition_output"
 NONCARRY_OBJECT_OUTPUT_IN_DO_WHILE = "noncarry_object_output_in_do_while"

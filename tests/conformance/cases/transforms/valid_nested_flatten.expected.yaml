@@ -1,0 +1,4 @@
+outcome: valid
+notes: >-
+  T is itself an Array here, so array_flatten removes exactly one level of
+  nesting: Array<Array<Array<Cup>>> to Array<Array<Cup>> (spec 14.4.2).

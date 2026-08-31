@@ -3,7 +3,7 @@ types:
   Cup:
     domain: object
 processes:
-  uncons:
+  bad:
     kind: atomic
     inputs:
       xs:

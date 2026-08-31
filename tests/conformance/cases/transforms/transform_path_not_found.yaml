@@ -6,20 +6,20 @@ processes:
   bad:
     kind: atomic
     inputs:
-      xs:
-        type: Array<Sample>
+      xss:
+        type: Array<Array<Sample>>
         phase: data
     outputs:
-      ys:
+      xs:
         type: Array<Sample>
         phase: data
     objects:
       transform:
-        - kind: array_reverse
+        - kind: array_flatten
           inputs:
-            xs: inputs.xs
+            xss: inputs.xss
           outputs:
-            ys: outputs.typo
+            xs: outputs.typo
   main:
     kind: atomic
     inputs: {}

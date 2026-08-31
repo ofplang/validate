@@ -138,23 +138,26 @@ def _parse_path(text: str) -> tuple[str, str] | None:
 
 # --- Transform role tables (spec 14.4) -------------------------------------
 # Each kind fixes an exact input-role and output-role set, and a role typing.
-# 'array' marks a role whose type must be Array<T>; 'elem' marks a bare T. All
-# 'elem'/element-of-'array' types must unify to the same T within one entry.
+# The number against a role is how many Array layers that role wraps the shared
+# element type T in, which is the whole of what v0's two kinds differ by: both
+# are regroupings, so one side is nested one level deeper than the other and
+# every role's T must unify within one entry.
 _TRANSFORM_ROLES = {
-    "array_uncons": ({"xs": "array"}, {"head": "elem", "tail": "array"}),
-    "array_cons": ({"head": "elem", "tail": "array"}, {"xs": "array"}),
-    "array_reverse": ({"xs": "array"}, {"ys": "array"}),
+    "array_flatten": ({"xss": 2}, {"xs": 1}),
+    "array_unflatten": ({"xs": 1}, {"xss": 2}),
 }
 
 
-def _element_type(role_kind: str, expr: TypeExpr | None) -> TypeExpr | None:
-    """Extract the T that a role contributes to unification, or None on shape
-    mismatch (e.g. an 'array' role whose path is not actually an Array)."""
-    if expr is None:
-        return None
-    if role_kind == "array":
-        return expr.elem if isinstance(expr, ArrayT) else None
-    return expr  # 'elem' role: the type itself is T
+def _element_type(depth: int, expr: TypeExpr | None) -> TypeExpr | None:
+    """Strip `depth` Array layers to get the T a role contributes to unification.
+
+    ``None`` when the type is not an Array that deep -- the role's shape is wrong,
+    which is a role type mismatch (spec 14.4.1)."""
+    for _ in range(depth):
+        if not isinstance(expr, ArrayT):
+            return None
+        expr = expr.elem
+    return expr
 
 
 def _validate_transform_entry(
@@ -252,23 +255,22 @@ def _validate_transform_entry(
         diags.add(errors.PURE_DATA_IN_TRANSFORM, "transform path is Pure Data", base, at=entry)
         return
 
-    # 4. Role typing (spec 14.4.1): an 'array' role must be bound to an Array<T>
-    # and an 'elem' role to a bare T, with every T unifying to one type. A
-    # non-Array type bound to an 'array' role (which `_element_type` would drop as
-    # None), or a unification conflict, is a role type mismatch.
+    # 4. Role typing (spec 14.4.1): each role must be bound to an Array nested to
+    # the depth the kind gives it, and every T left after stripping those layers
+    # must unify to one type. A type that is not nested that deep, or a
+    # unification conflict, is a role type mismatch.
     ts: list[TypeExpr] = []
     role_mismatch = False
     for role_types, exp in ((in_types, exp_in), (out_types, exp_out)):
-        for role, rkind in exp.items():
+        for role, depth in exp.items():
             expr = role_types.get(role)
             if expr is None:
                 continue
-            if rkind == "array" and not isinstance(expr, ArrayT):
+            t = _element_type(depth, expr)
+            if t is None:
                 role_mismatch = True
                 continue
-            t = _element_type(rkind, expr)
-            if t is not None:
-                ts.append(t)
+            ts.append(t)
     if role_mismatch or any(t != ts[0] for t in ts[1:]):
         diags.add(
             errors.TRANSFORM_ROLE_TYPE_MISMATCH,

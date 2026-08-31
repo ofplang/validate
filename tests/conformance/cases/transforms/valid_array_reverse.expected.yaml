@@ -1,2 +1,0 @@
-outcome: valid
-notes: "array_reverse preserves identities while changing order (spec 14.4.4)."

@@ -6,20 +6,16 @@ processes:
   bad:
     kind: atomic
     inputs:
-      xs:
-        type: Array<Cup>
+      xss:
+        type: Array<Array<Cup>>
         phase: data
-    outputs:
-      head:
-        type: Cup
-        phase: data
+    outputs: {}
     objects:
       transform:
-        - kind: array_uncons
+        - kind: array_flatten
           inputs:
-            xs: inputs.xs
-          outputs:
-            head: outputs.head
+            xss: inputs.xss
+          outputs: {}
   main:
     kind: atomic
     inputs: {}

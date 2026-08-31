@@ -1,2 +1,0 @@
-outcome: valid
-notes: "array_uncons on Array<Array<Cup>>; T=Array<Cup> unifies (spec 14.4.2)."

@@ -1,0 +1,4 @@
+outcome: valid
+notes: >-
+  array_flatten takes Array<Array<T>> to Array<T> and accounts for every Object
+  slot on both sides (spec 14.4.2).

@@ -1,0 +1,33 @@
+spec_version: "0.0"
+types:
+  Sample:
+    domain: object
+processes:
+  regroup:
+    kind: atomic
+    inputs:
+      xs:
+        type: Array<Sample>
+        phase: data
+      inner_len:
+        type: Int
+        phase: run
+    outputs:
+      xss:
+        type: Array<Array<Sample>>
+        phase: data
+    objects:
+      transform:
+        - kind: array_unflatten
+          inputs:
+            xs: inputs.xs
+          outputs:
+            xss: outputs.xss
+    contracts:
+      ensures:
+        - expr: "outputs.xss.view.length * inputs.inner_len.view == inputs.xs.view.length"
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

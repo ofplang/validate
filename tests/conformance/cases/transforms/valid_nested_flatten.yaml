@@ -3,23 +3,23 @@ types:
   Cup:
     domain: object
 processes:
-  rev:
+  flatten_outer:
     kind: atomic
     inputs:
-      xs:
-        type: Array<Cup>
+      xss:
+        type: Array<Array<Array<Cup>>>
         phase: data
     outputs:
-      ys:
-        type: Array<Cup>
+      xs:
+        type: Array<Array<Cup>>
         phase: data
     objects:
       transform:
-        - kind: array_reverse
+        - kind: array_flatten
           inputs:
-            xs: inputs.xs
+            xss: inputs.xss
           outputs:
-            ys: outputs.ys
+            xs: outputs.xs
   main:
     kind: atomic
     inputs: {}

@@ -2,4 +2,4 @@ outcome: invalid
 errors:
   - code: invalid_transform_roles
     path: "processes.bad.objects.transform[0]"
-notes: "array_uncons requires both outputs.head and outputs.tail roles (spec 14.4.1)."
+notes: "array_flatten requires the outputs.xs role (spec 14.4.1)."

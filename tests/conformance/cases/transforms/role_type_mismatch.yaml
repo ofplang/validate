@@ -8,22 +8,18 @@ processes:
   bad:
     kind: atomic
     inputs:
-      head:
-        type: Cup
-        phase: data
-      tail:
-        type: Array<Plate>
+      xss:
+        type: Array<Array<Cup>>
         phase: data
     outputs:
       xs:
-        type: Array<Cup>
+        type: Array<Plate>
         phase: data
     objects:
       transform:
-        - kind: array_cons
+        - kind: array_flatten
           inputs:
-            head: inputs.head
-            tail: inputs.tail
+            xss: inputs.xss
           outputs:
             xs: outputs.xs
   main:

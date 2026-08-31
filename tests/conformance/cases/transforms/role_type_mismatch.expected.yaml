@@ -1,4 +1,4 @@
 outcome: invalid
 errors:
   - code: transform_role_type_mismatch
-notes: "array_cons head=Cup but tail=Array<Plate>; T must unify (spec 14.4.1)."
+notes: "array_flatten xss=Array<Array<Cup>> but xs=Array<Plate>; T must unify (spec 14.4.1)."

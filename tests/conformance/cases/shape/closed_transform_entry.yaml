@@ -5,13 +5,13 @@ processes:
   main:
     kind: atomic
     inputs:
-      xs: { type: Array<Cup>, phase: data }
+      xss: { type: Array<Array<Cup>>, phase: data }
     outputs:
-      ys: { type: Array<Cup>, phase: data }
+      xs: { type: Array<Cup>, phase: data }
     objects:
       transform:
-        - kind: array_reverse
-          inputs: { xs: inputs.xs }
-          outputs: { ys: outputs.ys }
+        - kind: array_flatten
+          inputs: { xss: inputs.xss }
+          outputs: { xs: outputs.xs }
           bogus: 1
 entry: main

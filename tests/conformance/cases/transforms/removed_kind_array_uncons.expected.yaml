@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: unknown_transform_kind
+    path: "processes.bad.objects.transform[0].kind"
+notes: >-
+  array_uncons was removed in 0.1: it singles out the first element, which
+  criterion 3 of 14.4.0 rejects. A document still using it names a kind v0 does
+  not define. The ports the entry mentions are still counted as accounted for,
+  so the one mistake yields the one error that names it.
