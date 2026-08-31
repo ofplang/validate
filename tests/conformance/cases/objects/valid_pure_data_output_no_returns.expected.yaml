@@ -1,0 +1,6 @@
+outcome: valid
+notes: >-
+  Scope boundary for the Object provenance rule: v0 states the returns
+  requirement for Object tracking completeness (spec 13), not for Pure Data
+  output ports, so a Pure Data output port with no returns entry is left
+  alone here.

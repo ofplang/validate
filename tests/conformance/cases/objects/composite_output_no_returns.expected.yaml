@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: incomplete_objects
+    path: "processes.make_two.outputs.cup_b"
+notes: >-
+  A composite derives its Object behavior from the body graph and returns
+  (spec 10.2, 13). An Object-bearing output port with no returns entry has
+  unknown provenance: the composite promises an Object nothing in the body
+  produces.

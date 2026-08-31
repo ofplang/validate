@@ -7,14 +7,17 @@ are never implicitly created, lost, duplicated, or discarded. Two mechanisms:
   * **Atomic** processes declare Object behavior explicitly via an `objects`
     section (map / consume / create / transform), or via the `elidable_iso`
     inference when `objects` is omitted entirely (spec 15).
-  * **Composite** processes derive Object behavior from the body graph: every
-    Object-bearing value must flow to exactly one consumer (outdegree 1), which
-    is the linearity rule (spec 12.2).
+  * **Composite** processes derive Object behavior from the body graph and
+    `returns` (spec 10.2, 13): every Object-bearing value must flow to exactly
+    one consumer (outdegree 1), which is the linearity rule (spec 12.2), and
+    every Object-bearing output port must be returned, or its provenance is
+    unknown.
 
-An Object-bearing output port here is an ordinary node's output or a structured
-node's *exposed* output; which outputs a structured node exposes is
-:func:`structured_exposed_port`, shared with the type layer so the two cannot
-disagree about what a mode exposes.
+An Object-bearing output port is one of three things (spec 12.2): an ordinary
+node's output, a structured node's *exposed* output, or the composite boundary
+itself. All three are accounted for here; which outputs a structured node
+exposes is :func:`structured_exposed_port`, shared with the type layer so the
+two cannot disagree about what a mode exposes.
 
 Granularity note: v0 defines fate/provenance at the *Object slot* level. This
 implementation currently accounts at *port* level, which is exact for scalar
@@ -706,6 +709,24 @@ def _check_composite(
             diags.add(errors.OBJECT_OUTPUT_UNUSED, "Object-bearing value is unused", path, at=at)
         elif n > 1:
             diags.add(errors.OBJECT_FANOUT, "Object-bearing value fans out", path, at=at)
+
+    # Provenance at the boundary: a composite has no `objects` section to declare
+    # a `create` with (spec 10.2), so an Object-bearing output port is explained
+    # only by the `body.returns` entry that connects it. Without one the
+    # composite promises an Object nothing in the body produced -- unknown
+    # provenance (spec 13). The Pure Data side is deliberately untouched: v0
+    # states this requirement for Object tracking completeness only.
+    returns = body.get("returns")
+    returned = set(returns.keys()) if isinstance(returns, YMap) else set()
+    declared_outputs = proc.get("outputs")
+    for name, s in sig.outputs.items():
+        if s.object_bearing and name not in returned:
+            diags.add(
+                errors.INCOMPLETE_OBJECTS,
+                f"output {name!r} has no provenance",
+                f"{base}.outputs.{name}",
+                at=declared_outputs.get(name) if isinstance(declared_outputs, YMap) else proc,
+            )
 
 
 def check_objects(

@@ -1,0 +1,37 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  cup_create:
+    kind: atomic
+    inputs: {}
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      create:
+        - outputs.cup
+  make_two:
+    kind: composite
+    inputs: {}
+    outputs:
+      cup_a:
+        type: Cup
+        phase: data
+      cup_b:
+        type: Cup
+        phase: data
+    body:
+      nodes:
+        - id: c
+          process: cup_create
+      returns:
+        cup_a:
+          from: c.cup
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main
