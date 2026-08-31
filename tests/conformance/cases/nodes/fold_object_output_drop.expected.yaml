@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: object_output_bad_mode
+    path: "processes.main.body.nodes.loop.cup"
+notes: >-
+  An Object-bearing output may be carried or collected, never dropped
+  (spec 18.1 rule 6). Dropping it would discard the Objects the fold created
+  with no declared fate.

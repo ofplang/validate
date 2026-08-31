@@ -1,0 +1,40 @@
+spec_version: "0.0"
+features:
+  - node_fold
+types:
+  Cup:
+    domain: object
+processes:
+  make_cup:
+    kind: atomic
+    inputs:
+      seed:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      create:
+        - outputs.cup
+  main:
+    kind: composite
+    inputs:
+      seeds:
+        type: Array<Int>
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: loop
+          kind: fold
+          process: make_cup
+          each:
+            seed:
+              from: inputs.seeds
+          outputs:
+            cup:
+              mode: drop
+      returns: {}
+entry: main

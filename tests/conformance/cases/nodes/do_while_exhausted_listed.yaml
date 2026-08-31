@@ -1,0 +1,45 @@
+spec_version: "0.0"
+features:
+  - node_do_while
+processes:
+  passage_once:
+    kind: atomic
+    inputs:
+      acc:
+        type: Int
+        phase: data
+    outputs:
+      acc:
+        type: Int
+        phase: data
+      go:
+        type: Bool
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      seed:
+        type: Int
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: passage
+          kind: do_while
+          process: passage_once
+          carry:
+            acc:
+              from: inputs.seed
+          condition:
+            output: go
+          max_iterations:
+            value: 10
+          outputs:
+            acc:
+              mode: carry
+            go:
+              mode: drop
+            exhausted:
+              mode: collect
+      returns: {}
+entry: main

@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: last_on_empty_fold
-notes: "mode: last on an each known-empty at graph phase is invalid (spec 18.2)."

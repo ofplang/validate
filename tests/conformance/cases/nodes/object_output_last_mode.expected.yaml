@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: object_output_bad_mode
-notes: "Object-bearing output must not use mode: last (spec 18.1)."

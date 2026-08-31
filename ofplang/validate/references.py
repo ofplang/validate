@@ -8,22 +8,23 @@ They cover:
     (spec 2.6.6);
   * **reference resolution** — a `from` naming a body value must resolve to a
     composite input or a direct child node output (spec 2.6.1);
-  * **node input indegree** — an ordinary node's input ports must each be bound
-    exactly once (spec 12.1/12.2), distinguishing Pure Data (`data_indegree`)
-    from Object (`object_input_no_source`); and
+  * **binding correspondence** — a node's binding entries and its target's input
+    ports are one-to-one, whatever the node kind (spec 11), distinguishing Pure
+    Data (`data_indegree`) from Object (`object_input_no_source`) on the port
+    side and reporting `binding_port_not_found` on the entry side; and
   * **phase-flow** — a value may only flow into an equal-or-later phase
     (spec 6): data -> run/graph and run -> graph are errors.
 
 Structured nodes (map/fold/do_while/branch) reshape/route values in kind-specific
-ways, so per-port indegree and phase-flow are checked only for ordinary nodes;
-reference resolution still applies to all node bindings.
+ways, so phase-flow is checked only for ordinary nodes; reference resolution and
+binding correspondence apply to every node kind.
 """
 
 from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.objects import ProcSig
+from ofplang.validate.objects import DO_WHILE_RESERVED_OUTPUT, ProcSig
 from ofplang.validate.yamlnode import YMap, YScalar, YSeq
 
 # Phase order graph < run < data (spec 6). Rank lets us compare "earlier".
@@ -52,10 +53,14 @@ def _node_output_names(node: YMap, sigs: dict[str, ProcSig]) -> set[str]:
                 if isinstance(proc, YScalar) and proc.text in sigs:
                     names |= set(sigs[proc.text].outputs)
         return names
+    names = set()
     proc = node.get("process")
     if isinstance(proc, YScalar) and proc.text in sigs:
-        return set(sigs[proc.text].outputs)
-    return set()
+        names |= set(sigs[proc.text].outputs)
+    if kind == "do_while":
+        # The node's own reserved output, always defined (spec 19.3).
+        names.add(DO_WHILE_RESERVED_OUTPUT)
+    return names
 
 
 # The binding sections that supply a target's input ports, per node kind

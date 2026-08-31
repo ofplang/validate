@@ -9,7 +9,9 @@ tracking completeness. This pass checks the kind-specific structural rules:
     or consumed and created (structured carry compatibility, spec 16);
   * `map` and `fold` need at least one `each` source, which is what indexes
     their shape (spec 1.1, 17, 18);
-  * `do_while` requires an explicit `max_iterations` bound (spec 19); and
+  * `do_while` requires an explicit `max_iterations` bound, and exposes a
+    reserved `exhausted` output that its `outputs` section never lists
+    (spec 19, 19.3); and
   * `branch` forbids one-sided Object-bearing outputs — an Object output must be
     common to both arms so its identity does not depend on the chosen arm
     (spec 20, 20.1).
@@ -23,13 +25,13 @@ from __future__ import annotations
 
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
-from ofplang.validate.objects import ProcSig
+from ofplang.validate.objects import DO_WHILE_RESERVED_OUTPUT, ProcSig
 from ofplang.validate.types import Atom
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Valid output-control modes per structured node kind (spec 18.1, 19.1, 20.1).
-_FOLD_MODES = {"carry", "collect", "last", "drop"}
-_DO_WHILE_MODES = {"carry", "collect", "last", "drop"}
+_FOLD_MODES = {"carry", "collect", "drop"}
+_DO_WHILE_MODES = {"carry", "collect", "drop"}
 _BRANCH_MODES = {"common", "drop"}
 
 
@@ -81,7 +83,7 @@ def _check_all_outputs_listed(
     """When `outputs` is present, it is fully explicit: every target process
     output must be listed (fold rule 10, do_while rule 18). This includes the
     do_while condition output, which is an ordinary Data output listed with
-    collect/last/drop; only when `outputs` is omitted is it dropped by default
+    collect/drop; only when `outputs` is omitted is it dropped by default
     (spec 19.2)."""
     listed = set(outputs.keys())
     for oname in sorted(target.outputs):
@@ -116,22 +118,20 @@ def _map_sources(proc_def: YMap) -> dict[str, str]:
     return res
 
 
-def _each_literal_lengths(node: YMap) -> tuple[list[int], bool]:
-    """Lengths of `each` sources given as sequence literals, and whether *every*
-    each source is such a literal (so the traversal length is graph-known)."""
+def _each_literal_lengths(node: YMap) -> list[int]:
+    """Lengths of the `each` sources given as sequence literals, which are the
+    only ones whose length is known at graph phase (spec 17)."""
     each = node.get("each")
     if not isinstance(each, YMap):
-        return [], False
+        return []
     lengths: list[int] = []
-    total = 0
     for name in each.keys():
-        total += 1
         entry = each.get(name)
         if isinstance(entry, YMap):
             val = entry.get("value")
             if isinstance(val, YSeq):
                 lengths.append(len(val.items))
-    return lengths, (len(lengths) == total and total > 0)
+    return lengths
 
 
 def _carry_names(node: YMap) -> list[str]:
@@ -266,7 +266,7 @@ def _check_zip(diags: Diagnostics, node: YMap, nid: str, base: str) -> None:
     Only literal `each` sources have a graph-known length; if two of them differ,
     the zip-equal traversal is provably ill-formed before runtime.
     """
-    lengths, _ = _each_literal_lengths(node)
+    lengths = _each_literal_lengths(node)
     if len(set(lengths)) > 1:
         diags.add(
             errors.ZIP_MISMATCH,
@@ -291,13 +291,13 @@ def _check_fold_outputs(
         _check_output_modes(diags, outputs, _FOLD_MODES, nid, base)
         _check_carry_listed_as_carry(diags, node, outputs, nid, base)
         _check_all_outputs_listed(diags, outputs, target, nid, base)
-        # An Object-bearing output must not be dropped or reduced to `last`;
-        # it may only be carried or collected (spec 18.1 rule 7).
+        # An Object-bearing output must not be dropped; it may only be carried
+        # or collected (spec 18.1 rule 6).
         for oname in outputs.keys():
-            if oname in obj_outputs and _mode_of(outputs.get(oname)) in ("last", "drop"):
+            if oname in obj_outputs and _mode_of(outputs.get(oname)) == "drop":
                 diags.add(
                     errors.OBJECT_OUTPUT_BAD_MODE,
-                    f"Object output {oname!r} cannot use last/drop",
+                    f"Object output {oname!r} cannot use drop",
                     f"{base}.nodes.{nid}.{oname}",
                     at=node,
                 )
@@ -311,19 +311,6 @@ def _check_fold_outputs(
                 f"{base}.nodes.{nid}.{oname}",
                 at=node,
             )
-
-    # Empty-traversal + mode:last is invalid when emptiness is graph-known (18.2).
-    lengths, all_literal = _each_literal_lengths(node)
-    empty_known = all_literal and lengths and all(x == 0 for x in lengths)
-    if empty_known and isinstance(outputs, YMap) and any(
-        _mode_of(outputs.get(o)) == "last" for o in outputs.keys()
-    ):
-        diags.add(
-            errors.LAST_ON_EMPTY_FOLD,
-            "mode: last on a graph-empty traversal",
-            f"{base}.nodes.{nid}",
-            at=node,
-        )
 
 
 def _check_do_while_outputs(
@@ -351,6 +338,13 @@ def _check_do_while_outputs(
         _check_carry_listed_as_carry(diags, node, outputs, nid, base)
         if not noncarry_obj:
             _check_all_outputs_listed(diags, outputs, target, nid, base)
+        if DO_WHILE_RESERVED_OUTPUT in outputs.keys():
+            diags.add(
+                errors.RESERVED_OUTPUT_LISTED,
+                f"{DO_WHILE_RESERVED_OUTPUT!r} is the node's own output and is never listed",
+                f"{base}.nodes.{nid}.outputs.{DO_WHILE_RESERVED_OUTPUT}",
+                at=outputs.key_node(DO_WHILE_RESERVED_OUTPUT),
+            )
 
     # condition.output must name a Boolean Data output of the target (spec 19).
     cond = node.get("condition")

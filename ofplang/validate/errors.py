@@ -145,7 +145,10 @@ OUTPUT_NOT_LISTED = "output_not_listed"
 INVALID_OUTPUT_MODE = "invalid_output_mode"
 OBJECT_OUTPUT_BAD_MODE = "object_output_bad_mode"
 NONCARRY_OBJECT_OUTPUT_UNLISTED = "noncarry_object_output_unlisted"
-LAST_ON_EMPTY_FOLD = "last_on_empty_fold"
+# A `do_while` node's `outputs` listing the reserved `exhausted` output (spec
+# 19.3). That section shapes the target process's outputs, and `exhausted` is
+# the node's own, so there is nothing for a mode to say about it.
+RESERVED_OUTPUT_LISTED = "reserved_output_listed"
 ZIP_MISMATCH = "zip_mismatch"
 MISSING_MAX_ITERATIONS = "missing_max_iterations"
 BAD_CONDITION_OUTPUT = "bad_condition_output"

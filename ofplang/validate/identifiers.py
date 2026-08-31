@@ -19,10 +19,15 @@ from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 # The core identifier grammar (spec 2.4). Anchored so the whole name must match.
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-# Reserved keywords (spec 2.4). These are structural keys and role words that
-# must not be reused as user-defined names anywhere. Built-in type/trait names
-# (Bool/Int/Float/String/Array/Numeric) are handled separately as
-# `redeclare_builtin` in the type layer, so they are intentionally absent here.
+# Reserved keywords (spec 2.4). All but the last are structural keys and role
+# words that must not be reused as user-defined names anywhere. Built-in
+# type/trait names (Bool/Int/Float/String/Array/Numeric) are handled separately
+# as `redeclare_builtin` in the type layer, so they are intentionally absent.
+#
+# `exhausted` is the one entry that is not a structural key. A `do_while` node
+# exposes a reserved output of that name (spec 19.3), so a target process free
+# to declare an output called `exhausted` would make `<node>.exhausted` name two
+# different values with no way to say which.
 RESERVED_NAMES = frozenset(
     {
         "inputs", "outputs", "self", "view", "objects", "features", "traits",
@@ -30,7 +35,7 @@ RESERVED_NAMES = frozenset(
         "bind", "carry", "each", "args", "then", "else", "condition",
         "scheduling", "policies", "during", "object", "from", "to", "kind",
         "process", "phase", "type", "value", "script", "contracts", "requires",
-        "ensures",
+        "ensures", "exhausted",
     }
 )
 

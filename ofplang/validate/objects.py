@@ -35,6 +35,7 @@ from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.types import (
     ArrayT,
+    Atom,
     TypeEnv,
     TypeExpr,
     TypeParseError,
@@ -121,6 +122,13 @@ def build_signatures(doc: YMap, env: TypeEnv) -> dict[str, ProcSig]:
             generic=proc.get("type_params") is not None,
         )
     return sigs
+
+
+# The Boolean output a `do_while` node exposes of its own, true when it
+# terminated by reaching `max_iterations` (spec 19.3). It is not a target
+# process output: `exhausted` is a reserved name (2.4), so no target declares
+# one, and the `outputs` section that shapes target outputs never lists it.
+DO_WHILE_RESERVED_OUTPUT = "exhausted"
 
 
 # --- Path parsing for objects declarations --------------------------------
@@ -515,6 +523,12 @@ def structured_exposed_port(
     """
     kind = _text_of(node.get("kind"))
     outputs = node.get("outputs")
+
+    if kind == "do_while" and name == DO_WHILE_RESERVED_OUTPUT:
+        # The node's own output rather than the target's, so no mode shapes it
+        # and no `outputs` entry lists it (spec 19.3).
+        return (EXPOSED_ELEMENT, PortSig(type_expr=Atom("Bool"), object_bearing=False,
+                                         phase="data"))
 
     if kind == "branch":
         # Both arms declare the output with the same type (spec 20.1 rule 4,

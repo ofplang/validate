@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: reserved_output_listed
+    path: "processes.main.body.nodes.passage.outputs.exhausted"
+notes: >-
+  `exhausted` is the node's own output, not one of the target process's, so the
+  section that shapes target outputs has nothing to say about it. It is always
+  defined and never listed (spec 19.3, 19.1 rule 16).

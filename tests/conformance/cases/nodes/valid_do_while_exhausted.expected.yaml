@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  A do_while node exposes the reserved Bool `exhausted` alongside its target's
+  outputs (spec 19.3). It is not listed in `outputs` and is available whether or
+  not that section is present.

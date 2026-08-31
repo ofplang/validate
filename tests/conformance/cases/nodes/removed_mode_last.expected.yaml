@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: invalid_output_mode
+    path: "processes.main.body.nodes.loop.cup"
+notes: >-
+  mode: last was removed in 0.1. It singled out the final iteration, which is
+  what criterion 3 of 14.4.0 rejects for a set transform, and it was the last
+  partial construct in v0: an empty traversal has no final invocation. A carry
+  replaces it.

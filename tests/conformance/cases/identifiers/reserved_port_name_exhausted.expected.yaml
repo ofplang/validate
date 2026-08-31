@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: reserved_name
+    path: "processes.probe.outputs.exhausted"
+notes: >-
+  `exhausted` is reserved (spec 2.4). Were a target process free to declare an
+  output of that name, a reference to <node>.exhausted would name two different
+  values with no way to say which.

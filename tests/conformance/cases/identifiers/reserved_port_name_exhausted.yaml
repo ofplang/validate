@@ -1,0 +1,14 @@
+spec_version: "0.0"
+processes:
+  probe:
+    kind: atomic
+    inputs: {}
+    outputs:
+      exhausted:
+        type: Bool
+        phase: data
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main
