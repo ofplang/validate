@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: objects_map_type_mismatch
+    path: "processes.swap_kind.objects.map.outputs.plate"
+notes: >-
+  The two ports are both scalar Object types, so the slot counts agree and
+  Object tracking completeness is satisfied; the declaration nonetheless claims
+  a Cup's identity is a Plate96's (spec 14.1).

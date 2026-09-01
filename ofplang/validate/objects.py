@@ -45,6 +45,8 @@ from ofplang.validate.types import (
     is_object_bearing,
     parse_type,
     process_type_params,
+    resolve_error,
+    show_type,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
@@ -336,8 +338,52 @@ def _validate_transform_entry(
         )
 
 
+def _check_map_types(
+    diags: Diagnostics,
+    sig: ProcSig,
+    proc: YMap,
+    in_port: str,
+    out_port: str,
+    path: str,
+    at: YNode | None,
+    env: TypeEnv,
+) -> None:
+    """The two ports of an `objects.map` entry must have the same resolved type.
+
+    Matching is the structural relation of spec 11.1, which reduces to identity
+    of type expressions where no type parameter is involved. A process's own
+    parameters are rigid here: both ports belong to the same process, so a
+    parameter stands for a type already fixed by whoever instantiates it and
+    matches only itself.
+
+    A type that does not resolve is left alone; the type pass has reported it,
+    and comparing it would add a second diagnostic for one mistake.
+    """
+    from ofplang.validate.matching import MatchResult, match
+
+    want = sig.inputs.get(in_port)
+    got = sig.outputs.get(out_port)
+    if want is None or got is None or want.type_expr is None or got.type_expr is None:
+        return
+    rigid = process_type_params(proc)
+    if resolve_error(want.type_expr, env, rigid) is not None:
+        return
+    if resolve_error(got.type_expr, env, rigid) is not None:
+        return
+    if match(got.type_expr, want.type_expr, env=env, rigid=rigid) is not MatchResult.OK:
+        diags.add(
+            errors.OBJECTS_MAP_TYPE_MISMATCH,
+            f"objects.map relates {show_type(want.type_expr)} to "
+            f"{show_type(got.type_expr)}",
+            path,
+            at=at,
+        )
+
+
 # --- Atomic Object completeness --------------------------------------------
-def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> Skeleton:
+def _check_atomic(
+    diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig, env: TypeEnv
+) -> Skeleton:
     """Check an atomic process's Object declarations and return its skeleton.
 
     One walk answers both. The counting is what reports a slot given two fates
@@ -449,6 +495,17 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> S
                         fates[ip[1]] += 1
                         if op is not None and op[0] == "outputs":
                             phi[ip[1]] = (op[1], skeleton.IDENTITY)
+                            # The two ports must have the same resolved type
+                            # (spec 14.1): `object_slots` corresponds only then,
+                            # and the claim to preserve container structure says
+                            # nothing where it does not. Recorded in the
+                            # skeleton either way, so a wrong type is one
+                            # diagnostic rather than also an unaccounted slot.
+                            _check_map_types(
+                                diags, sig, proc, ip[1], op[1],
+                                f"{base}.objects.map.{out_path}",
+                                map_node.key_node(out_path), env,
+                            )
 
         # consume: input Object identities terminated here.
         consume = objects.get("consume")
@@ -947,7 +1004,7 @@ def check_objects(
         if proc.get("script") is not None:
             continue
         if sig.kind == "atomic":
-            atomic[pname] = _check_atomic(diags, pname, proc, sig)
+            atomic[pname] = _check_atomic(diags, pname, proc, sig, env)
         elif sig.kind == "composite":
             _check_composite(diags, pname, proc, sig, sigs)
 

@@ -12,8 +12,8 @@ processes:
     outputs:
       result: {type: Sample, phase: data}
     objects:
-      map:
-        outputs.result: inputs.s
+      consume: [inputs.s]
+      create: [outputs.result]
   arm_b:
     kind: atomic
     inputs:
@@ -21,8 +21,8 @@ processes:
     outputs:
       result: {type: Widget, phase: data}
     objects:
-      map:
-        outputs.result: inputs.s
+      consume: [inputs.s]
+      create: [outputs.result]
   use_sample:
     kind: atomic
     inputs:

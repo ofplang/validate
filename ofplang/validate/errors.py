@@ -116,6 +116,11 @@ OBJECT_INPUT_MULTI_SOURCE = "object_input_multi_source"
 INCOMPLETE_OBJECTS = "incomplete_objects"
 MULTIPLE_FATES = "multiple_fates"
 MULTIPLE_PROVENANCES = "multiple_provenances"
+# An `objects.map` entry whose source and target ports have different resolved
+# types (spec 14.1). Distinct from `binding_type_mismatch`, which is a value
+# bound to a port: this is a process's own claim that one of its ports carries
+# the identity of another, between ports whose Object slots do not correspond.
+OBJECTS_MAP_TYPE_MISMATCH = "objects_map_type_mismatch"
 OBJECTS_PATH_NOT_FOUND = "objects_path_not_found"
 DATA_INDEGREE = "data_indegree"
 OBJECT_VIA_BIND = "object_via_bind"
@@ -160,6 +165,10 @@ NONCARRY_OBJECT_OUTPUT_UNLISTED = "noncarry_object_output_unlisted"
 RESERVED_OUTPUT_LISTED = "reserved_output_listed"
 ZIP_MISMATCH = "zip_mismatch"
 MISSING_MAX_ITERATIONS = "missing_max_iterations"
+# `max_iterations` present but not an integer of at least 1 (spec 19,
+# requirement 5). A do_while invokes its target at least once, so a bound below
+# one contradicts the node's own semantics.
+INVALID_MAX_ITERATIONS = "invalid_max_iterations"
 BAD_CONDITION_OUTPUT = "bad_condition_output"
 NONCARRY_OBJECT_OUTPUT_IN_DO_WHILE = "noncarry_object_output_in_do_while"
 

@@ -1,0 +1,23 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  unwrap:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cups
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

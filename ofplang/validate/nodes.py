@@ -119,6 +119,36 @@ def _carry_names(node: YMap) -> list[str]:
     return carry.keys() if isinstance(carry, YMap) else []
 
 
+def _check_max_iterations(diags: Diagnostics, node: YMap, nid: str, base: str) -> None:
+    """`max_iterations` must be an integer of at least 1 (spec 19, requirement 5).
+
+    A `do_while` invokes its target at least once, so a bound below one
+    contradicts the node's own semantics. Only a `value` literal is decided
+    here: a bound given by `from` is a run-phase value, and 6.2 leaves that to
+    the earliest phase at which it is determined.
+    """
+    entry = node.get("max_iterations")
+    if not isinstance(entry, YMap):
+        return
+    value = entry.get("value")
+    if not isinstance(value, YScalar):
+        return
+    if not value.is_int:
+        diags.add(
+            errors.INVALID_MAX_ITERATIONS,
+            f"max_iterations must be an integer, got {value.text!r}",
+            f"{base}.nodes.{nid}.max_iterations",
+            at=value,
+        )
+    elif int(value.text) < 1:
+        diags.add(
+            errors.INVALID_MAX_ITERATIONS,
+            f"max_iterations must be at least 1, got {value.text}",
+            f"{base}.nodes.{nid}.max_iterations",
+            at=value,
+        )
+
+
 def _check_each_present(diags: Diagnostics, node: YMap, nid: str, base: str) -> None:
     """`map` and `fold` need a traversal length, and only `each` gives them one.
 
@@ -525,6 +555,8 @@ def check_nodes(
                         f"{base}.nodes.{nid}",
                         at=item,
                     )
+                else:
+                    _check_max_iterations(diags, item, nid, base)
                 if target is not None:
                     _check_carry_compat(diags, item, nid, target, base)
                     _check_carry_threading(diags, item, nid, target, target_sk, base)

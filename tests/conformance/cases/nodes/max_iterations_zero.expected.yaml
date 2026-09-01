@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: invalid_max_iterations
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: >-
+  A do_while invokes its target at least once (spec 19), so a bound of zero
+  contradicts the node's own semantics. Requirement 5 asks for an integer of at
+  least 1.

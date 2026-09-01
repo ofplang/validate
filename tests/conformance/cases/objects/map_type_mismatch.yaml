@@ -1,0 +1,25 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+  Plate96:
+    domain: object
+processes:
+  swap_kind:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      plate:
+        type: Plate96
+        phase: data
+    objects:
+      map:
+        outputs.plate: inputs.cup
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

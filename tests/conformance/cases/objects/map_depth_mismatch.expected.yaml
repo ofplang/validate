@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: objects_map_type_mismatch
+    path: "processes.unwrap.objects.map.outputs.cup"
+notes: >-
+  A map between ports of different nesting depth. 14.1 says the mapping
+  preserves length, nesting and order, which says nothing between slot
+  structures that do not correspond; regrouping is what objects.transform is
+  for.

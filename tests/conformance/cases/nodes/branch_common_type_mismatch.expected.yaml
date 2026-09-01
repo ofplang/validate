@@ -1,5 +1,10 @@
 outcome: invalid
 errors:
   - code: branch_common_type_mismatch
-    path: "main.body.nodes.pick.result"
-notes: "The common output 'result' is Sample in one arm and Widget in the other (spec 20.1 rule 4, 20.3)."
+    path: "processes.main.body.nodes.pick.result"
+notes: >-
+  The common output 'result' is Sample in one arm and Widget in the other
+  (spec 20.1 rule 4). Both arms consume and create, so their skeletons are
+  equal and 20.2 is satisfied: the types are the only thing that disagrees.
+  Written with consume/create rather than a map because 14.1 now forbids a map
+  between ports of different types, which is a different mistake.
