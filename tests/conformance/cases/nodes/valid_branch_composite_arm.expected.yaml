@@ -1,0 +1,7 @@
+outcome: valid
+notes: >-
+  One arm is atomic and declares an identity map; the other is a composite whose
+  body returns the argument unchanged. Both skeletons are the same
+  correspondence, so the arms agree (spec 20.2). Before 0.1 the comparison read
+  `objects` declarations, which a composite does not have, so a composite arm
+  could never satisfy the rule.

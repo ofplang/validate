@@ -1,0 +1,7 @@
+outcome: valid
+notes: >-
+  Both arms consume the argument and create the output. The creation point is
+  the branch node rather than the arm (spec 12.4.3), so whichever arm runs one
+  new Object appears at that node's output and where its identity came from does
+  not depend on the arm: the skeletons are equal (spec 20.2). This was forbidden
+  before 0.1, by a prohibition the skeleton framing does not reproduce.

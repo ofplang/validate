@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: carry_not_threaded
+    path: "processes.main.body.nodes.f.carry.w"
+notes: >-
+  The same defect as carry_object_escapes, written as a composite: the carried
+  Object leaves through the collected output while the carry output is created
+  fresh. A composite has no `objects` section, so this could only be judged once
+  a skeleton was derived from a body graph (spec 12.4.5).

@@ -12,20 +12,22 @@ tracking completeness. This pass checks the kind-specific structural rules:
   * `do_while` requires an explicit `max_iterations` bound, and exposes a
     reserved `exhausted` output that its `outputs` section never lists
     (spec 19, 19.3); and
-  * `branch` forbids one-sided Object-bearing outputs — an Object output must be
-    common to both arms so its identity does not depend on the chosen arm
-    (spec 20, 20.1).
+  * `branch` requires its two arms to have equal Object skeletons, so that where
+    an output Object's identity comes from does not depend on the chosen arm
+    (spec 20.2, 12.4.7); a one-sided Object output is reported before that, as
+    the more specific mistake it is.
 
-Composite linearity intentionally skips structured nodes (their output shaping
-differs — e.g. `map` wraps outputs in Array), so their Object flow is governed
-by these node-local rules plus the target processes' completeness.
+What a node's Object flow is, rather than whether it is well-formed, is the
+skeleton the objects pass computes; this pass reads it where a rule is about two
+skeletons agreeing.
 """
 
 from __future__ import annotations
 
-from ofplang.validate import errors
+from ofplang.validate import errors, skeleton
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.objects import DO_WHILE_RESERVED_OUTPUT, ProcSig
+from ofplang.validate.skeleton import Skeleton
 from ofplang.validate.types import Atom
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
@@ -96,28 +98,6 @@ def _check_all_outputs_listed(
             )
 
 
-def _map_sources(proc_def: YMap) -> dict[str, str]:
-    """For an arm process, map output port -> input port it identity-maps from.
-
-    Used for branch identity-equivalence: an output produced by `create`/
-    `transform` (or absent) is simply not in this dict, which the caller reads
-    as "not a same-argument identity map".
-    """
-    res: dict[str, str] = {}
-    objects = proc_def.get("objects")
-    if isinstance(objects, YMap):
-        mp = objects.get("map")
-        if isinstance(mp, YMap):
-            for out_path in mp.keys():
-                src = mp.get(out_path)
-                op = out_path.split(".")
-                if len(op) == 2 and op[0] == "outputs" and isinstance(src, YScalar):
-                    ip = src.text.split(".")
-                    if len(ip) == 2 and ip[0] == "inputs":
-                        res[op[1]] = ip[1]
-    return res
-
-
 def _each_literal_lengths(node: YMap) -> list[int]:
     """Lengths of the `each` sources given as sequence literals, which are the
     only ones whose length is known at graph phase (spec 17)."""
@@ -156,26 +136,13 @@ def _check_each_present(diags: Diagnostics, node: YMap, nid: str, base: str) -> 
         )
 
 
-def _object_fates(proc_def: YMap) -> tuple[dict[str, str], set[str], set[str]]:
-    """An atomic process's declared Object behavior: identity map sources, the
-    consumed input ports, and the created output ports."""
-    consumed: set[str] = set()
-    created: set[str] = set()
-    objects = proc_def.get("objects")
-    if isinstance(objects, YMap):
-        for section, out in (("consume", consumed), ("create", created)):
-            seq = objects.get(section)
-            if isinstance(seq, YSeq):
-                for item in seq.items:
-                    if isinstance(item, YScalar):
-                        parts = item.text.split(".")
-                        if len(parts) == 2:
-                            out.add(parts[1])
-    return _map_sources(proc_def), consumed, created
-
-
 def _check_carry_threading(
-    diags: Diagnostics, node: YMap, nid: str, target: ProcSig, proc_def: YNode | None, base: str
+    diags: Diagnostics,
+    node: YMap,
+    nid: str,
+    target: ProcSig,
+    target_sk: Skeleton | None,
+    base: str,
 ) -> None:
     """An Object-bearing carry must be threaded through the target (spec 16).
 
@@ -186,19 +153,22 @@ def _check_carry_threading(
     node's own Object correspondence would have to name a position within a
     collection, which v0 cannot express.
 
-    Only a target whose Object behavior is declared directly can be answered
-    here. A composite derives it from its body graph, which is the skeleton
-    derivation, so its carry is left to that.
+    Asked of the target's skeleton, so a composite target is judged the same way
+    as an atomic one; a composite declares no `objects` section and could not be
+    judged at all while this read declarations. The requirement is about Object
+    identity, so a Pure Data carry is not subject to it.
     """
-    if not isinstance(proc_def, YMap) or target.kind != "atomic":
+    if target_sk is None:
         return
-    map_sources, consumed, created = _object_fates(proc_def)
     for cname in _carry_names(node):
         out_port = target.outputs.get(cname)
         if out_port is None or not out_port.object_bearing:
+            # Data has no identity, so the same-name output is the next carry
+            # value whatever it was computed from (spec 16).
             continue
-        preserved = map_sources.get(cname) == cname
-        replaced = cname in consumed and cname in created
+        restricted = skeleton.restrict(target_sk, {cname})
+        preserved = restricted.phi.get(cname, (None, None))[0] == cname
+        replaced = cname in restricted.consumed and cname in target_sk.created
         if not preserved and not replaced:
             diags.add(
                 errors.CARRY_NOT_THREADED,
@@ -368,7 +338,12 @@ def _check_do_while_outputs(
 
 
 def _check_branch(
-    diags: Diagnostics, node: YMap, nid: str, sigs: dict[str, ProcSig], processes: YMap, base: str
+    diags: Diagnostics,
+    node: YMap,
+    nid: str,
+    sigs: dict[str, ProcSig],
+    skeletons: dict[str, Skeleton],
+    base: str,
 ) -> None:
     """Reject Object-bearing outputs that are not common to both arms.
 
@@ -464,43 +439,43 @@ def _check_branch(
                     at=node,
                 )
 
-    # Identity-equivalence for outputs common to both arms (spec 20.2): each arm
-    # must derive the output from the *same* branch argument via an identity map.
-    # An arm that creates/replaces the output (no map source), or maps it from a
-    # different argument, makes the resulting identity arm-dependent.
-    then_def = processes.get(then_proc.text) if isinstance(then_proc, YScalar) else None
-    else_def = processes.get(else_proc.text) if isinstance(else_proc, YScalar) else None
-    if isinstance(then_def, YMap) and isinstance(else_def, YMap):
-        then_src = _map_sources(then_def)
-        else_src = _map_sources(else_def)
-        for name in sorted(then_obj & else_obj):
-            t_src, e_src = then_src.get(name), else_src.get(name)
-            if t_src is None or e_src is None or t_src != e_src:
-                diags.add(
-                    errors.BRANCH_NOT_IDENTITY_EQUIVALENT,
-                    f"common Object output {name!r} is not identity-equivalent across arms",
-                    f"{base}.nodes.{nid}.{name}",
-                    at=node,
-                )
-    elif isinstance(then_def, YMap) and else_arm is None:
-        # Implicit identity else (spec 20.3): the omitted else re-exposes each
-        # Object-bearing argument `name` as output `name` via identity from
-        # `inputs.name`. So the then arm must likewise map each common Object
-        # output from the *same-named* argument; creating it, or mapping it from a
-        # different argument, makes the Object identity depend on the chosen arm.
-        then_src = _map_sources(then_def)
-        for name in sorted(then_obj & else_obj):
-            if then_src.get(name) != name:
-                diags.add(
-                    errors.BRANCH_NOT_IDENTITY_EQUIVALENT,
-                    f"common Object output {name!r} is not identity-equivalent "
-                    "to the implicit else",
-                    f"{base}.nodes.{nid}.{name}",
-                    at=node,
-                )
+    # Skeleton equality (spec 20.2). What the arms must agree on is where each
+    # Object comes from, which is their skeletons, and both are placed at *this*
+    # node so that two arms which both create agree: the creation point is the
+    # node, so whichever arm runs, one new Object appears at this node's output.
+    #
+    # Skipped where an output is one-sided, which is reported just above: the
+    # skeletons then differ because of that, and saying so twice describes one
+    # mistake in two ways.
+    if then_obj == else_obj:
+        then_sk = skeletons.get(then_proc.text) if isinstance(then_proc, YScalar) else None
+        if isinstance(else_arm, YMap):
+            else_sk = skeletons.get(else_proc.text) if isinstance(else_proc, YScalar) else None
+        else:
+            # The omitted arm is the identity correspondence over the
+            # Object-bearing arguments (spec 20.3, 12.4.5).
+            else_sk = skeleton.identity_map(sorted(else_obj))
+        mismatched = (
+            then_sk is not None
+            and else_sk is not None
+            and not skeleton.equal(then_sk.placed_at(nid), else_sk.placed_at(nid))
+        )
+        if mismatched:
+            diags.add(
+                errors.BRANCH_SKELETON_MISMATCH,
+                "the two arms have unequal Object skeletons",
+                f"{base}.nodes.{nid}",
+                at=node,
+            )
 
 
-def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None:
+def check_nodes(
+    doc: YMap,
+    diags: Diagnostics,
+    sigs: dict[str, ProcSig],
+    skeletons: dict[str, Skeleton] | None = None,
+) -> None:
+    skeletons = skeletons or {}
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
         return
@@ -530,12 +505,14 @@ def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None
             proc_ref = item.get("process")
             target = sigs.get(proc_ref.text) if isinstance(proc_ref, YScalar) else None
 
-            proc_def = processes.get(proc_ref.text) if isinstance(proc_ref, YScalar) else None
+            target_sk = (
+                skeletons.get(proc_ref.text) if isinstance(proc_ref, YScalar) else None
+            )
 
             if kind == "fold":
                 if target is not None:
                     _check_carry_compat(diags, item, nid, target, base)
-                    _check_carry_threading(diags, item, nid, target, proc_def, base)
+                    _check_carry_threading(diags, item, nid, target, target_sk, base)
                     _check_fold_outputs(diags, item, nid, target, base)
                 _check_zip(diags, item, nid, base)
                 _check_each_present(diags, item, nid, base)
@@ -550,10 +527,10 @@ def check_nodes(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None
                     )
                 if target is not None:
                     _check_carry_compat(diags, item, nid, target, base)
-                    _check_carry_threading(diags, item, nid, target, proc_def, base)
+                    _check_carry_threading(diags, item, nid, target, target_sk, base)
                     _check_do_while_outputs(diags, item, nid, target, base)
             elif kind == "branch":
-                _check_branch(diags, item, nid, sigs, processes, base)
+                _check_branch(diags, item, nid, sigs, skeletons, base)
             elif kind == "map":
                 # map uses zip-equal over its each sources (spec 17).
                 _check_zip(diags, item, nid, base)

@@ -1,0 +1,100 @@
+spec_version: "0.0"
+features:
+  - node_fold
+types:
+  W:
+    domain: object
+processes:
+  make_w:
+    kind: atomic
+    inputs: {}
+    outputs:
+      w:
+        type: W
+        phase: data
+    objects:
+      create:
+        - outputs.w
+  step:
+    kind: composite
+    inputs:
+      w:
+        type: W
+        phase: data
+      x:
+        type: Int
+        phase: data
+    outputs:
+      w:
+        type: W
+        phase: data
+      other:
+        type: W
+        phase: data
+    body:
+      nodes:
+        - id: fresh
+          process: make_w
+      returns:
+        other:
+          from: inputs.w
+        w:
+          from: fresh.w
+  w_use:
+    kind: atomic
+    inputs:
+      w:
+        type: W
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.w
+  ws_use:
+    kind: atomic
+    inputs:
+      ws:
+        type: Array<W>
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.ws
+  main:
+    kind: composite
+    inputs:
+      xs:
+        type: Array<Int>
+        phase: data
+      w0:
+        type: W
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: f
+          kind: fold
+          process: step
+          carry:
+            w:
+              from: inputs.w0
+          each:
+            x:
+              from: inputs.xs
+          outputs:
+            w:
+              mode: carry
+            other:
+              mode: collect
+        - id: u1
+          process: w_use
+          state:
+            w:
+              from: f.w
+        - id: u2
+          process: ws_use
+          state:
+            ws:
+              from: f.other
+      returns: {}
+entry: main

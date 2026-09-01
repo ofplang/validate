@@ -1,5 +1,9 @@
 outcome: invalid
 errors:
-  - code: branch_not_identity_equivalent
-    path: "main.body.nodes.pick.cup"
-notes: "With else omitted, the implicit identity else re-exposes arg 'cup' by identity, but the then arm creates a new cup -- arm-dependent Object identity (spec 20.2, 20.3)."
+  - code: branch_skeleton_mismatch
+    path: "processes.main.body.nodes.pick"
+notes: >-
+  With `else` omitted, the implicit arm is the identity correspondence over the
+  Object-bearing arguments (spec 20.3), and the then arm consumes the cup and
+  creates a new one. The skeletons are unequal, so whether `pick.cup` is the cup
+  that entered would depend on which arm ran (spec 20.2).

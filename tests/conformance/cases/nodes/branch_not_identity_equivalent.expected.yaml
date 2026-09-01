@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: branch_not_identity_equivalent
-notes: "Both arms independently consume+create cup, so identity depends on the arm (spec 20.2)."

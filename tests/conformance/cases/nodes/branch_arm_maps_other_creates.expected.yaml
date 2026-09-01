@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: branch_skeleton_mismatch
+    path: "processes.main.body.nodes.pick"
+notes: >-
+  One arm corresponds the argument to the output and the other consumes it and
+  creates a new Object, so phi and N disagree (spec 20.2). Downstream, whether
+  `pick.cup` is the Cup that entered depends on which arm ran.

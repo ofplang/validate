@@ -144,7 +144,11 @@ CARRY_NOT_THREADED = "carry_not_threaded"
 # index it by. An absent `each` and an empty one are the same error.
 MISSING_EACH_SOURCE = "missing_each_source"
 ONE_SIDED_OBJECT_OUTPUT = "one_sided_object_output"
-BRANCH_NOT_IDENTITY_EQUIVALENT = "branch_not_identity_equivalent"
+# The two arms of a `branch` have unequal Object skeletons (spec 20.2, 12.4.7).
+# Renamed from `branch_not_identity_equivalent` in 0.1, when what the check
+# compares stopped being a pair of `objects` declarations and became the
+# skeleton the arms derive -- from a body graph as readily as from a section.
+BRANCH_SKELETON_MISMATCH = "branch_skeleton_mismatch"
 BRANCH_COMMON_TYPE_MISMATCH = "branch_common_type_mismatch"
 OUTPUT_NOT_LISTED = "output_not_listed"
 INVALID_OUTPUT_MODE = "invalid_output_mode"

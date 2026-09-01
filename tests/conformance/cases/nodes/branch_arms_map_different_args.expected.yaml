@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: branch_skeleton_mismatch
+    path: "processes.main.body.nodes.pick"
+notes: >-
+  Both arms expose both Objects and consume neither, so the counts agree and the
+  principle of 1.1 is satisfied; the arms nonetheless swap which argument each
+  output comes from, so phi disagrees (spec 20.2). This is the case 12.4.7 is
+  stronger than 1.1 for.
