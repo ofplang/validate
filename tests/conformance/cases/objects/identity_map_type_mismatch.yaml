@@ -1,0 +1,24 @@
+spec_version: "0.1"
+types:
+  Cup:
+    domain: object
+  Plate96:
+    domain: object
+processes:
+  odd:
+    kind: atomic
+    behavior:
+      - object_identity_map
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      cup:
+        type: Plate96
+        phase: data
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

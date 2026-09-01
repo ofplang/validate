@@ -338,6 +338,22 @@ def _validate_transform_entry(
         )
 
 
+def _same_port(a: PortSig, b: PortSig, proc: YMap, env: TypeEnv) -> bool:
+    """Whether two ports have the same resolved type and phase.
+
+    Used by the `object_identity_map` inference (spec 15), which pairs on name,
+    type and phase. Type equality is the structural relation of 11.1, the same
+    one an explicitly written `objects.map` is held to (14.1), so the inference
+    cannot produce a mapping a document may not write.
+    """
+    from ofplang.validate.matching import MatchResult, match
+
+    if a.type_expr is None or b.type_expr is None or a.phase != b.phase:
+        return False
+    rigid = process_type_params(proc)
+    return match(b.type_expr, a.type_expr, env=env, rigid=rigid) is MatchResult.OK
+
+
 def _check_map_types(
     diags: Diagnostics,
     sig: ProcSig,
@@ -419,9 +435,16 @@ def _check_atomic(
     # vocabulary and not the top-level `traits` that declare type traits.
     if objects is None:
         if _has_behavior(proc, OBJECT_IDENTITY_MAP):
-            # Same-name Object input/output pairs are accounted; a leftover
-            # Object port with no counterpart falls through to "incomplete".
-            paired = sorted(obj_inputs & obj_outputs)
+            # The marker pairs an Object input with the output of the same name,
+            # *type, and phase* (spec 15). Name alone would let the inference
+            # produce a mapping that 14.1 rejects when it is written out. A port
+            # with no such counterpart is one the marker does not explain, and
+            # falls through to "incomplete" below.
+            paired = sorted(
+                name
+                for name in obj_inputs & obj_outputs
+                if _same_port(sig.inputs[name], sig.outputs[name], proc, env)
+            )
             obj_inputs -= set(paired)
             obj_outputs -= set(paired)
             inferred = skeleton.identity_map(paired)

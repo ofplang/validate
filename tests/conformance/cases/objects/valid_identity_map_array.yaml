@@ -1,0 +1,22 @@
+spec_version: "0.1"
+types:
+  Cup:
+    domain: object
+processes:
+  inspect_all:
+    kind: atomic
+    behavior:
+      - object_identity_map
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

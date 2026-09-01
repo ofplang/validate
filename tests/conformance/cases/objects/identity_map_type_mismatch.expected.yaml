@@ -1,0 +1,11 @@
+outcome: invalid
+errors:
+  - code: incomplete_objects
+    path: "processes.odd.inputs.cup"
+  - code: incomplete_objects
+    path: "processes.odd.outputs.cup"
+notes: >-
+  The marker pairs an input with the output of the same name, type, and phase
+  (spec 15). These two share only a name, so the marker explains neither: an
+  identity map between a Cup and a Plate96 is what 14.1 rejects when it is
+  written out, and the inference cannot produce what a document may not say.

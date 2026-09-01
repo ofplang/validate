@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  An Array port is inferred like any other (spec 15); the inferred map is read
+  recursively over Object slots, which is what makes the section's claim about
+  length, nesting and order mean something.
