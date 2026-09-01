@@ -33,8 +33,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ofplang.validate import errors
+from ofplang.validate import errors, skeleton
 from ofplang.validate.diagnostics import Diagnostics
+from ofplang.validate.skeleton import Skeleton
 from ofplang.validate.types import (
     ArrayT,
     Atom,
@@ -212,6 +213,7 @@ def _validate_transform_entry(
     base: str,
     claimed_inputs: set[str],
     claimed_outputs: set[str],
+    pairs: list[tuple[str, str]],
 ) -> None:
     """Validate one transform entry and record which Object ports it accounts for.
 
@@ -245,8 +247,17 @@ def _validate_transform_entry(
                         types[role] = ports[port].type_expr
         return types
 
+    before_in, before_out = set(claimed_inputs), set(claimed_outputs)
     in_types = _record(in_roles, claimed_inputs, "inputs")
     out_types = _record(out_roles, claimed_outputs, "outputs")
+
+    # Both v0 kinds have exactly one Object-bearing role on each side (14.4), so
+    # what this entry claims is one correspondence, which is what it contributes
+    # to the skeleton (12.4.4).
+    entry_in = claimed_inputs - before_in
+    entry_out = claimed_outputs - before_out
+    if len(entry_in) == 1 and len(entry_out) == 1:
+        pairs.append((next(iter(entry_in)), next(iter(entry_out))))
 
     # 1. Kind must be a defined v0 transform.
     if kind not in _TRANSFORM_ROLES:
@@ -326,8 +337,19 @@ def _validate_transform_entry(
 
 
 # --- Atomic Object completeness --------------------------------------------
-def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> None:
+def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> Skeleton:
+    """Check an atomic process's Object declarations and return its skeleton.
+
+    One walk answers both. The counting is what reports a slot given two fates
+    or none (spec 13), and the same declarations are what the skeleton is made
+    of (12.4.4), so reading the section twice would let the two disagree about a
+    declaration only half of which resolved.
+    """
     base = f"processes.{pname}"
+    phi: dict[str, tuple[str, str]] = {}
+    consumed: set[str] = set()
+    created: set[str] = set()
+    transform_pairs: list[tuple[str, str]] = []
 
     obj_inputs = {n for n, s in sig.inputs.items() if s.object_bearing}
     obj_outputs = {n for n, s in sig.outputs.items() if s.object_bearing}
@@ -353,10 +375,11 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
         if _has_behavior(proc, OBJECT_IDENTITY_MAP):
             # Same-name Object input/output pairs are accounted; a leftover
             # Object port with no counterpart falls through to "incomplete".
-            for name in list(obj_inputs):
-                if name in obj_outputs:
-                    obj_inputs.discard(name)
-                    obj_outputs.discard(name)
+            paired = sorted(obj_inputs & obj_outputs)
+            obj_inputs -= set(paired)
+            obj_outputs -= set(paired)
+            inferred = skeleton.identity_map(paired)
+            phi.update(inferred.phi)
         # Whatever remains is unaccounted.
         for name in sorted(obj_inputs):
             diags.add(
@@ -372,7 +395,7 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                 f"{base}.outputs.{name}",
                 at=_out_at(name),
             )
-        return
+        return Skeleton(phi=phi)
 
     # Count fates (per Object input) and provenances (per Object output) across
     # the four declaration mechanisms. Counting (rather than boolean) lets us
@@ -424,6 +447,8 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                         _not_found(src.text, f"{base}.objects.map.{out_path}", src)
                     elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
+                        if op is not None and op[0] == "outputs":
+                            phi[ip[1]] = (op[1], skeleton.IDENTITY)
 
         # consume: input Object identities terminated here.
         consume = objects.get("consume")
@@ -435,6 +460,7 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                         _not_found(item.text, f"{base}.objects.consume", item)
                     elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
+                        consumed.add(ip[1])
 
         # create: new output Object identities.
         create = objects.get("create")
@@ -446,6 +472,7 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                         _not_found(item.text, f"{base}.objects.create", item)
                     elif op is not None and op[0] == "outputs" and op[1] in provs:
                         provs[op[1]] += 1
+                        created.add(op[1])
 
         # transform: validated in detail, and its Object ports counted once.
         transform = objects.get("transform")
@@ -455,7 +482,13 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             for i, entry in enumerate(transform.items):
                 if isinstance(entry, YMap):
                     _validate_transform_entry(
-                        diags, entry, sig, f"{base}.objects.transform[{i}]", claimed_in, claimed_out
+                        diags,
+                        entry,
+                        sig,
+                        f"{base}.objects.transform[{i}]",
+                        claimed_in,
+                        claimed_out,
+                        transform_pairs,
                     )
             for name in claimed_in:
                 if name in fates:
@@ -463,6 +496,9 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
             for name in claimed_out:
                 if name in provs:
                     provs[name] += 1
+            for in_port, out_port in transform_pairs:
+                if in_port in fates and out_port in provs:
+                    phi[in_port] = (out_port, skeleton.ORDER_PRESERVING)
 
     # Emit completeness diagnostics. "map + consume on the same input" surfaces
     # here as a fate count of 2 -> multiple_fates (spec 13.1 example).
@@ -496,6 +532,12 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
                 f"{base}.outputs.{name}",
                 at=_out_at(name),
             )
+
+    return Skeleton(
+        phi=phi,
+        consumed=frozenset(consumed),
+        created=dict.fromkeys(created, None),
+    )
 
 
 # --- Structured node output exposure (spec 17-21) --------------------------
@@ -780,16 +822,118 @@ def _check_composite(
             )
 
 
-def check_objects(
-    doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, ProcSig] | None = None
-) -> None:
-    """`sigs` are the process signatures the validator already built for the other
-    graph-level passes; they are rebuilt here only when a caller does not have them."""
+def node_skeleton(
+    node: YMap, sigs: dict[str, ProcSig], skeletons: dict[str, Skeleton]
+) -> Skeleton | None:
+    """The skeleton a body node has, placed at that node (spec 12.4.5).
+
+    A node's ports carry the same names as its target's, and a `map` node's lift
+    and a `fold` node's collect relate the collections rather than the elements
+    without changing the correspondence kind, so a node's skeleton is its
+    target's placed at it. A `branch` takes the skeleton its two arms agree on,
+    which 20.2 requires them to have; the `then` arm stands for it here and the
+    node pass is what checks that the `else` arm matches.
+    """
+    nid = node.get("id")
+    if not isinstance(nid, YScalar):
+        return None
+    kind = _text_of(node.get("kind"))
+    name = _text_of(_arm_process(node, "then") if kind == "branch" else node.get("process"))
+    inner = skeletons.get(name) if name is not None else None
+    return inner.placed_at(nid.text) if inner is not None else None
+
+
+def _arm_process(node: YMap, arm: str) -> YNode | None:
+    arm_node = node.get(arm)
+    return arm_node.get("process") if isinstance(arm_node, YMap) else None
+
+
+def compose_process_skeletons(
+    doc: YMap, sigs: dict[str, ProcSig], atomic: dict[str, Skeleton]
+) -> dict[str, Skeleton]:
+    """Every process's skeleton, composites composed along their bodies (12.4.5).
+
+    Composites are composed in dependency order so that a composite invoking
+    another already has its skeleton; the process dependency graph is acyclic
+    (10.2), and a name that cannot be resolved is simply left out, which the
+    entry pass has already reported.
+
+    This reports nothing. It is the semantic artifact the checks that compare
+    skeletons read, and every defect it can run into -- an unbound port, an
+    unused value, a name that does not resolve -- is reported where it is found.
+    """
     processes = doc.get("processes")
     if not isinstance(processes, YMap):
-        return
+        return dict(atomic)
+    out = dict(atomic)
+
+    for pname in _dependency_order(processes):
+        proc = processes.get(pname)
+        sig = sigs.get(pname)
+        if not isinstance(proc, YMap) or sig is None or sig.kind != "composite":
+            continue
+        body = proc.get("body")
+        if not isinstance(body, YMap):
+            continue
+        nodes = body.get("nodes")
+        node_skeletons: dict[str, Skeleton] = {}
+        if isinstance(nodes, YSeq):
+            for item in nodes.items:
+                if isinstance(item, YMap):
+                    nid = item.get("id")
+                    sk = node_skeleton(item, sigs, out)
+                    if isinstance(nid, YScalar) and sk is not None:
+                        node_skeletons[nid.text] = sk
+        out[pname] = skeleton.compose_body(
+            body,
+            [n for n, s in sig.inputs.items() if s.object_bearing],
+            node_skeletons,
+        )
+    return out
+
+
+def _dependency_order(processes: YMap) -> list[str]:
+    """Process names with every process a body invokes before the process itself."""
+    order: list[str] = []
+    seen: set[str] = set()
+
+    def visit(name: str, stack: frozenset[str]) -> None:
+        if name in seen or name in stack:
+            return
+        proc = processes.get(name)
+        if isinstance(proc, YMap):
+            body = proc.get("body")
+            nodes = body.get("nodes") if isinstance(body, YMap) else None
+            if isinstance(nodes, YSeq):
+                for item in nodes.items:
+                    if not isinstance(item, YMap):
+                        continue
+                    for ref in (item.get("process"), _arm_process(item, "then"),
+                                _arm_process(item, "else")):
+                        if isinstance(ref, YScalar):
+                            visit(ref.text, stack | {name})
+        seen.add(name)
+        order.append(name)
+
+    for pname in processes.keys():
+        visit(pname, frozenset())
+    return order
+
+
+def check_objects(
+    doc: YMap, diags: Diagnostics, env: TypeEnv, sigs: dict[str, ProcSig] | None = None
+) -> dict[str, Skeleton]:
+    """Check Object declarations, and return each process's skeleton (spec 12.4).
+
+    `sigs` are the process signatures the validator already built for the other
+    graph-level passes; they are rebuilt here only when a caller does not have them.
+    """
+    processes = doc.get("processes")
+    if not isinstance(processes, YMap):
+        return {}
     if sigs is None:
         sigs = build_signatures(doc, env)
+    atomic: dict[str, Skeleton] = {}
     for pname in processes.keys():
         proc = processes.get(pname)
         if not isinstance(proc, YMap):
@@ -803,6 +947,11 @@ def check_objects(
         if proc.get("script") is not None:
             continue
         if sig.kind == "atomic":
-            _check_atomic(diags, pname, proc, sig)
+            atomic[pname] = _check_atomic(diags, pname, proc, sig)
         elif sig.kind == "composite":
             _check_composite(diags, pname, proc, sig, sigs)
+
+    # Composed after the walk above rather than during it, so that the order in
+    # which diagnostics are reported stays the document's while composition
+    # takes the dependency order it needs.
+    return compose_process_skeletons(doc, sigs, atomic)
