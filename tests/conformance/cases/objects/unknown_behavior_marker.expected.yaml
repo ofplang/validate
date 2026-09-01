@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: unknown_behavior
+    path: "processes.inspect.behavior[0]"
+notes: >-
+  `object_identity_map` is the only behavior marker v0 defines (spec 15).
+  `elidable_iso` was its name before 0.1; nothing checked a marker's spelling
+  before, so a document keeping the old one would otherwise be read as
+  declaring nothing at all.

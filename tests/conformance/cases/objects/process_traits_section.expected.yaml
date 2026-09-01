@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.inspect.traits"
+notes: >-
+  A process declares behavior markers under `behavior`, not `traits` (spec 15).
+  `traits` remains the top-level section that declares type traits, which is the
+  ambiguity the rename removes.

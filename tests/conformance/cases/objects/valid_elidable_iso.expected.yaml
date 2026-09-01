@@ -1,2 +1,0 @@
-outcome: valid
-notes: "objects omitted + elidable_iso infers same-name identity map (spec 15)."

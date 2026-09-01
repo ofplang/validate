@@ -5,8 +5,10 @@ must have exactly one explicit fate (input) or provenance (output), so Objects
 are never implicitly created, lost, duplicated, or discarded. Two mechanisms:
 
   * **Atomic** processes declare Object behavior explicitly via an `objects`
-    section (map / consume / create / transform), or via the `elidable_iso`
-    inference when `objects` is omitted entirely (spec 15).
+    section (map / consume / create / transform), or via the
+    `object_identity_map` inference when `objects` is omitted entirely
+    (spec 15). That marker is declared under a process's `behavior`, a
+    vocabulary of its own that this module also closes.
   * **Composite** processes derive Object behavior from the body graph and
     `returns` (spec 10.2, 13): every Object-bearing value must flow to exactly
     one consumer (outdegree 1), which is the linearity rule (spec 12.2), and
@@ -44,6 +46,41 @@ from ofplang.validate.types import (
     process_type_params,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
+
+# The one behavior marker v0 defines (spec 15). A process that omits `objects`
+# entirely and declares it gets a same-name identity map inferred for its
+# top-level Object-bearing ports.
+OBJECT_IDENTITY_MAP = "object_identity_map"
+BEHAVIOR_MARKERS = frozenset({OBJECT_IDENTITY_MAP})
+
+
+def _has_behavior(proc: YMap, marker: str) -> bool:
+    section = proc.get("behavior")
+    return isinstance(section, YSeq) and any(
+        isinstance(item, YScalar) and item.text == marker for item in section.items
+    )
+
+
+def check_behavior(doc: YMap, diags: Diagnostics) -> None:
+    """Every `behavior` entry must name a marker v0 defines (spec 15)."""
+    processes = doc.get("processes")
+    if not isinstance(processes, YMap):
+        return
+    for pname in processes.keys():
+        proc = processes.get(pname)
+        if not isinstance(proc, YMap):
+            continue
+        section = proc.get("behavior")
+        if not isinstance(section, YSeq):
+            continue
+        for i, item in enumerate(section.items):
+            if isinstance(item, YScalar) and item.text not in BEHAVIOR_MARKERS:
+                diags.add(
+                    errors.UNKNOWN_BEHAVIOR,
+                    f"unknown behavior marker {item.text!r}",
+                    f"processes.{pname}.behavior[{i}]",
+                    at=item,
+                )
 
 
 # --- Per-process signature -------------------------------------------------
@@ -308,14 +345,12 @@ def _check_atomic(diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig) -> N
 
     objects = proc.get("objects")
 
-    # `elidable_iso` inference applies only when `objects` is omitted entirely
-    # (spec 15): infer a same-name identity map for top-level Object ports.
+    # `object_identity_map` inference applies only when `objects` is omitted
+    # entirely (spec 15): infer a same-name identity map for top-level Object
+    # ports. The marker is declared under `behavior`, which is a process's own
+    # vocabulary and not the top-level `traits` that declare type traits.
     if objects is None:
-        traits_node = proc.get("traits")
-        is_elidable = isinstance(traits_node, YSeq) and any(
-            isinstance(t, YScalar) and t.text == "elidable_iso" for t in traits_node.items
-        )
-        if is_elidable:
+        if _has_behavior(proc, OBJECT_IDENTITY_MAP):
             # Same-name Object input/output pairs are accounted; a leftover
             # Object port with no counterpart falls through to "incomplete".
             for name in list(obj_inputs):

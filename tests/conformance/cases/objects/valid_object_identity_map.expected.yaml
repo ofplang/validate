@@ -1,0 +1,4 @@
+outcome: valid
+notes: >-
+  With `objects` omitted entirely, the `object_identity_map` marker infers a
+  same-name identity mapping for every top-level Object-bearing port (spec 15).

@@ -50,11 +50,11 @@ _PROCESS_KINDS = {"atomic", "composite"}
 # `description` is optional metadata allowed on a process definition (spec 2.7).
 _ATOMIC_KEYS = {
     "kind", "inputs", "outputs", "objects", "scheduling", "script",
-    "type_params", "where", "traits", "contracts", "description",
+    "type_params", "where", "behavior", "contracts", "description",
 }
 _COMPOSITE_KEYS = {
     "kind", "inputs", "outputs", "body", "objects", "scheduling",
-    "type_params", "where", "traits", "contracts", "description",
+    "type_params", "where", "behavior", "contracts", "description",
 }
 
 # Closed key sets for the type/trait layer and process port/type-param

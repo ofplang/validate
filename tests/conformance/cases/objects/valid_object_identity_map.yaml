@@ -5,8 +5,8 @@ types:
 processes:
   inspect:
     kind: atomic
-    traits:
-      - elidable_iso
+    behavior:
+      - object_identity_map
     inputs:
       cup:
         type: Cup

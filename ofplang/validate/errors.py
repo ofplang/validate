@@ -71,6 +71,11 @@ INVALID_PHASE_FLOW = "invalid_phase_flow"
 
 # --- Traits (spec 7.3) ----------------------------------------------------
 UNKNOWN_TRAIT = "unknown_trait"
+# A `behavior` entry naming a marker v0 does not define (spec 15). Separate from
+# `unknown_trait`: a type trait is a predicate on a type declared in the
+# top-level `traits` section, and a behavior marker is a statement about a
+# process. They are different vocabularies, and the fix is in a different place.
+UNKNOWN_BEHAVIOR = "unknown_behavior"
 IMPLEMENTS_NUMERIC = "implements_numeric"
 REDECLARE_NUMERIC = "redeclare_numeric"
 
