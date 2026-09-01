@@ -1,0 +1,5 @@
+outcome: valid
+notes: >-
+  An earlier MINOR of the same MAJOR is accepted and read by the current rules
+  (spec 2.1). This document uses nothing 0.1 changed; one that did would get the
+  error naming that construct, which says more than a version mismatch would.

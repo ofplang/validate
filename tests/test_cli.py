@@ -11,7 +11,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ofplang.validate.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, main
+from ofplang.validate.version import SPEC_VERSION
 
 CASES = Path(__file__).parent / "conformance" / "cases"
 VALID = str(CASES / "shape" / "valid_minimal.yaml")
@@ -63,3 +66,15 @@ def test_quiet_suppresses_diagnostic_lines(capsys) -> None:
     # Summary is still shown, but the individual diagnostic line is not.
     assert "error" in out  # summary counts errors
     assert "unknown_type" not in out
+
+
+def test_version_reports_both_the_package_and_the_specification(capsys):
+    """`--version` answers two different questions (spec 2.1): which package this
+    is, and which revision of the specification it implements. A user cannot
+    infer the second from the first."""
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "ofp-validate" in out
+    assert f"specification {SPEC_VERSION}" in out

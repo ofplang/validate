@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: unsupported_spec_version
+    path: "spec_version"
+notes: >-
+  A later revision of the same generation. This implementation cannot know what
+  the document was written to mean, so reading it by these rules would answer a
+  question that was not asked (spec 2.1).

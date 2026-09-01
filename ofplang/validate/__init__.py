@@ -9,8 +9,10 @@ from ofplang.validate.validator import (
     expand,
     validate,
 )
+from ofplang.validate.version import SPEC_VERSION
 
 __all__ = [
+    "SPEC_VERSION",
     "Diagnostic",
     "ValidationResult",
     "validate",

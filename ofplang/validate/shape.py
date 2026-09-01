@@ -29,6 +29,7 @@ import re
 from ofplang.validate import errors
 from ofplang.validate.diagnostics import Diagnostics
 from ofplang.validate.validator import EXTENSION_TOLERANT
+from ofplang.validate.version import SPEC_VERSION
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # Allowed top-level keys (spec 2, 2.3). Sections may be omitted; only
@@ -333,6 +334,29 @@ def _check_spec_version(diags: Diagnostics, doc: YMap) -> None:
         diags.add(
             errors.MALFORMED_SPEC_VERSION,
             f"spec_version must be a MAJOR.MINOR string, got {node.text!r}",
+            "spec_version",
+            at=node,
+        )
+        return
+
+    # A well-formed declaration decides whether this implementation answers at
+    # all (spec 2.1). It does not select an interpretation: a document is read by
+    # the rules of the revision implemented here whatever it declares.
+    major, minor = (int(part) for part in node.text.split("."))
+    want_major, want_minor = (int(part) for part in SPEC_VERSION.split("."))
+    if major != want_major:
+        diags.add(
+            errors.UNSUPPORTED_SPEC_VERSION,
+            f"spec_version {node.text} is a different generation of the language; "
+            f"this implements {SPEC_VERSION}",
+            "spec_version",
+            at=node,
+        )
+    elif minor > want_minor:
+        diags.add(
+            errors.UNSUPPORTED_SPEC_VERSION,
+            f"spec_version {node.text} is later than the {SPEC_VERSION} this "
+            "implements, so what the document was written to mean is not known here",
             "spec_version",
             at=node,
         )

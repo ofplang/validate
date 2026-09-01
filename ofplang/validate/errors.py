@@ -31,6 +31,12 @@ UNKNOWN_NODE_KIND = "unknown_node_kind"
 
 # --- Reserved metadata (spec 2.1, 2.7) ------------------------------------
 MALFORMED_SPEC_VERSION = "malformed_spec_version"
+# A well-formed `spec_version` naming a revision this implementation does not
+# implement (spec 2.1): a later MINOR of the same MAJOR, or any other MAJOR.
+# An earlier MINOR is accepted -- a revision within one MAJOR is an edit of the
+# same language, and a document using something it removed gets the error naming
+# that construct, which says more than a version mismatch would.
+UNSUPPORTED_SPEC_VERSION = "unsupported_spec_version"
 # `description` present but not a string scalar (spec 2.7). A null value is
 # reported by the universal null scan instead, to avoid double-reporting.
 MALFORMED_DESCRIPTION = "malformed_description"

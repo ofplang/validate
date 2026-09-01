@@ -27,6 +27,7 @@ from pathlib import Path
 
 from ofplang.validate import validate
 from ofplang.validate.validator import EXTENSION_TOLERANT, STRICT, ValidationResult
+from ofplang.validate.version import SPEC_VERSION
 
 # Exit codes are part of the CLI contract (scripts/CI depend on them).
 EXIT_OK = 0
@@ -38,6 +39,19 @@ _RED = "\033[31m"
 _GREEN = "\033[32m"
 _DIM = "\033[2m"
 _RESET = "\033[0m"
+
+
+def _package_version() -> str:
+    """This package's version, or a placeholder when it is not installed (as in
+    a source checkout run through PYTHONPATH)."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # pragma: no cover - importlib.metadata is stdlib here
+        return "unknown"
+    try:
+        return version("ofplang-validate")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -65,6 +79,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="suppress per-diagnostic lines; show only the summary",
     )
     parser.add_argument("--no-color", action="store_true", help="disable ANSI color output")
+    # Which specification revision this validator answers for is not something a
+    # user can infer from the package version, and 2.1 makes the two different
+    # questions: a document declares a revision, and an implementation implements
+    # one. Report both.
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"ofp-validate {_package_version()} (specification {SPEC_VERSION})",
+    )
     return parser
 
 

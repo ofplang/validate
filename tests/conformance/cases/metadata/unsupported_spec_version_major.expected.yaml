@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unsupported_spec_version
+    path: "spec_version"
+notes: "A different MAJOR is a different generation of the language (spec 2.1)."
