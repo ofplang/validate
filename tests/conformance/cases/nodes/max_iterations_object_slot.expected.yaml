@@ -1,0 +1,6 @@
+outcome: invalid
+match: superset
+errors:
+  - code: object_in_constant_slot
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: "A constant slot is Pure Data (11.2). `object_output_unused` is reported alongside and is correct: 12.2 counts a reference as a `from` in a *binding* section or a `returns` entry, and a constant slot is neither, so the port genuinely has no fate. Match is superset for that reason. The derived `binding_type_mismatch` -- a Cup is not an Int -- is suppressed."

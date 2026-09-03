@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: node_dependency_cycle
+    path: "processes.main.body.nodes"
+notes: "The Object-bearing form of the same cycle. It satisfies 12.2 as well: each output port has outdegree one and every Object-bearing value is referred to exactly once. Nothing creates and nothing consumes, so the composition of the body's node skeletons (12.4.5) is not defined -- an undefined operation rather than a reported error."

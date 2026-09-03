@@ -1,0 +1,38 @@
+spec_version: "0.1"
+processes:
+  arm:
+    kind: atomic
+    outputs:
+      flag:
+        type: Bool
+        phase: data
+  main:
+    kind: composite
+    body:
+      nodes:
+        - id: b1
+          kind: branch
+          condition:
+            from: b2.flag
+          args: {}
+          then:
+            process: arm
+          else:
+            process: arm
+          outputs:
+            flag:
+              mode: common
+        - id: b2
+          kind: branch
+          condition:
+            from: b1.flag
+          args: {}
+          then:
+            process: arm
+          else:
+            process: arm
+          outputs:
+            flag:
+              mode: common
+      returns: {}
+entry: main

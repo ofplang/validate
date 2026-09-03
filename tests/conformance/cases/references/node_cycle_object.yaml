@@ -1,0 +1,34 @@
+spec_version: "0.1"
+types:
+  Cup:
+    domain: object
+processes:
+  pass:
+    kind: atomic
+    inputs:
+      c:
+        type: Cup
+        phase: data
+    outputs:
+      c:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.c: inputs.c
+  main:
+    kind: composite
+    body:
+      nodes:
+        - id: a
+          process: pass
+          state:
+            c:
+              from: b.c
+        - id: b
+          process: pass
+          state:
+            c:
+              from: a.c
+      returns: {}
+entry: main

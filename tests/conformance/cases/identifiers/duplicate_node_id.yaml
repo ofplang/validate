@@ -1,0 +1,38 @@
+spec_version: "0.1"
+processes:
+  step:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      m:
+        type: Int
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      m:
+        type: Int
+        phase: data
+    body:
+      nodes:
+        - id: dup
+          process: step
+          bind:
+            n:
+              from: inputs.n
+        - id: dup
+          process: step
+          bind:
+            n:
+              value: 1
+      returns:
+        m:
+          from: dup.m
+entry: main

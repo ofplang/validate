@@ -126,9 +126,24 @@ def check_identifiers(doc: YMap, diags: Diagnostics) -> None:
             nodes = body.get("nodes")
 
             if isinstance(nodes, YSeq):
+                # Node ids are also unique within one body (spec 2.4, 27 rule 10a).
+                # `nodes` is a sequence, so a repeat is not a duplicate mapping key
+                # and `check_duplicates` never sees it; without this check a
+                # reference `<node_id>.<output>` names no one value and resolves to
+                # whichever node the implementation reaches first.
+                seen: set[str] = set()
                 for i, item in enumerate(nodes.items):
                     if isinstance(item, YMap):
                         id_node = item.get("id")
 
                         if isinstance(id_node, YScalar):
                             _check(diags, id_node.text, f"{base}.body.nodes[{i}].id", at=id_node)
+                            # Reported at the later occurrence: that is the one to rename.
+                            if id_node.text in seen:
+                                diags.add(
+                                    errors.DUPLICATE_NODE_ID,
+                                    f"duplicate node id {id_node.text!r}",
+                                    f"{base}.body.nodes[{i}].id",
+                                    at=id_node,
+                                )
+                            seen.add(id_node.text)

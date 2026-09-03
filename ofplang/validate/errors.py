@@ -46,6 +46,12 @@ INVALID_IDENTIFIER = "invalid_identifier"
 DOT_IN_IDENTIFIER = "dot_in_identifier"
 RESERVED_NAME = "reserved_name"
 DUPLICATE_PORT_NAME = "duplicate_port_name"
+# Two nodes of one composite body with the same `id` (spec 2.4, 27 rule 10a).
+# Separate from `duplicate_key` and `duplicate_port_name`, which report a
+# repeated *mapping key*: `nodes` is a sequence, so a repeated id is not one.
+# Without this, `<node_id>.<output>` names no one value and a reference to it
+# resolves to whichever node the implementation happens to reach first.
+DUPLICATE_NODE_ID = "duplicate_node_id"
 
 # --- Type expressions (spec 2.5, 7.1) -------------------------------------
 UNKNOWN_TYPE = "unknown_type"
@@ -196,6 +202,14 @@ MALFORMED_PREFER_PAYLOAD = "malformed_prefer_payload"
 NO_ENTRY_PROCESS = "no_entry_process"
 UNKNOWN_ENTRY_PROCESS = "unknown_entry_process"
 RECURSIVE_PROCESS_DEPENDENCY = "recursive_process_dependency"
+# A cycle in the *node* dependency graph of one composite body (spec 10.2,
+# 27 rule 21b). A different graph from the one `recursive_process_dependency`
+# reports: that one is about which process invokes which, this one about the
+# order of nodes within one body. An edge runs from one node to another where a
+# `from` in a binding or control section (spec 21.0) of the second names an
+# output of the first -- `branch.condition` and `do_while.max_iterations` are
+# control sections that carry one.
+NODE_DEPENDENCY_CYCLE = "node_dependency_cycle"
 
 # --- References (spec 2.6) ------------------------------------------------
 # Spec 2.6 separates three reference failures: a malformed one, one whose target
@@ -228,6 +242,15 @@ LITERAL_TYPE_MISMATCH = "literal_type_mismatch"
 # `literal_type_mismatch`: the literal is not the wrong *type*, it is the wrong
 # *kind of thing* for that port, and no literal would be right.
 LITERAL_ON_OBJECT_PORT = "literal_on_object_port"
+
+# --- Constant slots (spec 11.2) -------------------------------------------
+# A constant slot is Pure Data, so an Object-bearing value must not fill one
+# (spec 11.2). Distinct from `literal_on_object_port`, which is the mirror
+# case -- a literal bound to an Object-bearing *port*. A slot's other
+# conditions need no code of their own: it is treated as an input port, so its
+# phase is `invalid_phase_flow`, its type `binding_type_mismatch`, and an
+# unresolvable `from` `unknown_reference`.
+OBJECT_IN_CONSTANT_SLOT = "object_in_constant_slot"
 # An `each` source is traversed element-wise, so it must be an Array (spec 11.1,
 # 17, 18). Separate from `binding_type_mismatch`, which is what an Array of the
 # wrong element type gets: this one is not the wrong element type, it is not a

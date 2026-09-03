@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: node_dependency_cycle
+    path: "processes.main.body.nodes"
+notes: "The cycle runs through `do_while.max_iterations`, a control section that carries a `from` (21.0). Because a constant slot's `from` is a body dataflow reference (11.2), it contributes an ordinary edge to the dependency graph, which is why the slot's source was not restricted to `inputs.*`. `c.v` is `run` phase and the slot's upper bound is `run`, so no phase error masks the cycle here."

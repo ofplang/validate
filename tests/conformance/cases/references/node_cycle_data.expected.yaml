@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: node_dependency_cycle
+    path: "processes.main.body.nodes"
+notes: "A Pure Data cycle satisfies every degree rule of 12.1 -- each Data input port has indegree one and fan-out is allowed on the outputs -- and touches neither the Object skeleton nor 13. Evaluation cannot start. This is the case that shows the requirement is not derivable from the degree rules."

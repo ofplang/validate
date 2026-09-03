@@ -1,0 +1,2 @@
+outcome: valid
+notes: "A `run` phase `Int` fills the `max_iterations` constant slot, whose upper bound is `run` (19 requirement 5, 11.2). Valid before and after the slot checks land -- today because the entry is not checked at all, afterwards because `run <= run`. Keep it beside the three invalid cases so that adding the checks cannot make this one fail."

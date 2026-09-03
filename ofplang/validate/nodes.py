@@ -124,8 +124,11 @@ def _check_max_iterations(diags: Diagnostics, node: YMap, nid: str, base: str) -
 
     A `do_while` invokes its target at least once, so a bound below one
     contradicts the node's own semantics. Only a `value` literal is decided
-    here: a bound given by `from` is a run-phase value, and 6.2 leaves that to
-    the earliest phase at which it is determined.
+    here: a bound given by `from` is not known until run phase, and 6.2 leaves
+    it to the earliest phase at which it is determined. That the source *may*
+    be a run-phase value is a separate condition -- `max_iterations` is a
+    constant slot with upper bound `run` (spec 11.2) -- and is checked with the
+    binding phase-flow in `references.py`.
     """
     entry = node.get("max_iterations")
     if not isinstance(entry, YMap):

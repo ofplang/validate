@@ -1,0 +1,2 @@
+outcome: valid
+notes: "A literal is a `graph` phase value (11.1.1, 27 rule 87a), and `graph` is the least phase, so a literal satisfies the phase requirement of every Pure Data position. Without that rule an implementation treating a literal as `data` would reject this."

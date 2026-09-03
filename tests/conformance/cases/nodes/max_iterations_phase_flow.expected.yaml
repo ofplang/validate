@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: invalid_phase_flow
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: "The slot's phase upper bound is `run` (19 requirement 5), and `s.v` is `data`. A binding into a `graph` or `run` phase port is rejected already; a slot is treated as an input port (11.2), so the same rule applies to it."

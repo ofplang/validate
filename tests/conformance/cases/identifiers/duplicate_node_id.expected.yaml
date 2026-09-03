@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: duplicate_node_id
+    path: "processes.main.body.nodes[1].id"
+notes: "Two nodes of one body with the same id (spec 2.4, 27 rule 10a). `nodes` is a sequence, so this is not a duplicate mapping key: `dup.m` names no one value, and the `returns` entry resolves to whichever node the implementation reaches first."

@@ -194,6 +194,67 @@ def _source_object_bearing(ref: tuple[str, str], sig: ProcSig, nodes_by_id, sigs
     return False
 
 
+def _node_from_refs(node: YMap) -> list[str]:
+    """Every `from` text in a node's binding and control sections (spec 21.0).
+
+    The dependency graph of a body is built from these (spec 10.2, rule 21b).
+    `branch.condition` and `do_while.max_iterations` are control sections that
+    carry a `from`; `do_while.condition` names a target output rather than a
+    reference (spec 2.6.7), `then`/`else` name processes, and `outputs` names
+    modes, so none of those contributes one.
+    """
+    out: list[str] = []
+    for section in _BINDING_SECTIONS:
+        m = node.get(section)
+        if isinstance(m, YMap):
+            for portname in m.keys():
+                entry = m.get(portname)
+                if isinstance(entry, YMap):
+                    frm = entry.get("from")
+                    if isinstance(frm, YScalar):
+                        out.append(frm.text)
+    for section in ("condition", "max_iterations"):
+        m = node.get(section)
+        if isinstance(m, YMap):
+            frm = m.get("from")
+            if isinstance(frm, YScalar):
+                out.append(frm.text)
+    return out
+
+
+def _find_cycle(deps: dict[str, set[str]]) -> list[str]:
+    """One cycle of ``deps``, as the nodes on it closing back on the first, or [].
+
+    ``deps[n]`` holds the nodes ``n`` depends on. Iteration is over sorted keys
+    so the reported cycle is the same on every run, which a diagnostic that a
+    test matches has to be.
+    """
+    white, grey, black = 0, 1, 2
+    color = dict.fromkeys(deps, white)
+    path: list[str] = []
+
+    def visit(n: str) -> list[str]:
+        color[n] = grey
+        path.append(n)
+        for m in sorted(deps.get(n, ())):
+            if color.get(m, black) == grey:
+                return path[path.index(m) :] + [m]
+            if color.get(m, black) == white:
+                found = visit(m)
+                if found:
+                    return found
+        path.pop()
+        color[n] = black
+        return []
+
+    for n in sorted(deps):
+        if color[n] == white:
+            found = visit(n)
+            if found:
+                return found
+    return []
+
+
 def _check_composite(
     diags: Diagnostics, pname: str, proc: YMap, sig: ProcSig, sigs: dict[str, ProcSig]
 ) -> None:
@@ -223,6 +284,31 @@ def _check_composite(
         if owner == "inputs":
             return name in input_names
         return (owner, name) in node_out
+
+    # The body's node dependency graph must be acyclic (spec 10.2, 27 rule 21b).
+    # A different graph from the one `recursive_process_dependency` reports:
+    # that one is about which process invokes which, this one about the order of
+    # nodes within one body. An `inputs.p` reference creates no edge, and an
+    # unresolvable one creates none either, so a cycle is never fabricated on
+    # top of an unknown reference.
+    deps: dict[str, set[str]] = {}
+    for node in node_items:
+        id_node = node.get("id")
+        if not isinstance(id_node, YScalar):
+            continue
+        preds = deps.setdefault(id_node.text, set())
+        for text in _node_from_refs(node):
+            ref = _parse_ref(text)
+            if ref is not None and ref[0] != "inputs" and ref[0] in nodes_by_id:
+                preds.add(ref[0])
+    cycle = _find_cycle(deps)
+    if cycle:
+        diags.add(
+            errors.NODE_DEPENDENCY_CYCLE,
+            "node dependency graph contains a cycle: " + " -> ".join(cycle),
+            f"{base}.nodes",
+            at=nodes,
+        )
 
     def _check_source_entry(entry: YMap, path: str, target_input_phase: str | None) -> None:
         """Arity + reference resolution + phase-flow for one source entry."""
@@ -307,6 +393,35 @@ def _check_composite(
                                 epath,
                                 at=frm,
                             )
+
+        # `max_iterations` is a constant slot, not a binding section (spec 11.2,
+        # 21.0). A slot is treated as an input port whose declared phase is the
+        # slot's upper bound -- `run` for this one (spec 19 requirement 5) -- so
+        # the arity, resolution and phase-flow rules of a binding apply to it
+        # unchanged. Its slot type is `Int`, matched with the other types in
+        # `bindings.py`; the `value` literal half is in `nodes.py`.
+        if kind == "do_while":
+            mi = node.get("max_iterations")
+            if isinstance(mi, YMap):
+                mpath = f"{base}.nodes.{nid}.max_iterations"
+                _check_source_entry(mi, mpath, "run")
+                # A constant slot is Pure Data (spec 11.2). Only a resolvable
+                # source is flagged, so this never stacks on an unknown
+                # reference already reported above.
+                frm = mi.get("from")
+                if isinstance(frm, YScalar):
+                    ref = _parse_ref(frm.text)
+                    if (
+                        ref
+                        and _resolves(ref)
+                        and _source_object_bearing(ref, sig, nodes_by_id, sigs)
+                    ):
+                        diags.add(
+                            errors.OBJECT_IN_CONSTANT_SLOT,
+                            "Object-bearing value fills a constant slot",
+                            mpath,
+                            at=frm,
+                        )
 
         # A branch condition is itself a body dataflow reference.
         if kind == "branch":

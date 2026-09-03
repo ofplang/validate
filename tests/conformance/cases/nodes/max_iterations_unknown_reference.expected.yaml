@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_reference
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: "`max_iterations` is a constant slot (11.2) filled by a source entry, and a `from` in one is a body dataflow reference. This case is the root of the three that follow: the entry is not visited by the reference layer at all, so nothing about it -- resolution, phase, or type -- is checked."

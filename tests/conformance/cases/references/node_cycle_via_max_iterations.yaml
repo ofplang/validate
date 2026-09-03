@@ -1,0 +1,55 @@
+spec_version: "0.1"
+processes:
+  budget:
+    kind: atomic
+    inputs:
+      x:
+        type: Int
+        phase: data
+    outputs:
+      v:
+        type: Int
+        phase: run
+  step:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      n:
+        type: Int
+        phase: data
+      continue:
+        type: Bool
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      n0:
+        type: Int
+        phase: data
+    body:
+      nodes:
+        - id: loop
+          kind: do_while
+          process: step
+          carry:
+            n:
+              from: inputs.n0
+          condition:
+            output: continue
+          max_iterations:
+            from: c.v
+          outputs:
+            n:
+              mode: carry
+            continue:
+              mode: drop
+        - id: c
+          process: budget
+          bind:
+            x:
+              from: loop.n
+      returns: {}
+entry: main

@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: binding_type_mismatch
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: "The slot type is `Int` (19 requirement 5). A `String` value fills it here. 11.1's comparison table is indexed by binding section and a slot is not one, which is why 11.2 says a slot is treated as an input port."

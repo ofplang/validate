@@ -462,6 +462,30 @@ def _check_composite(
                         at=frm,
                     )
 
+        # `max_iterations` is a constant slot of slot type `Int` (spec 11.2, 19
+        # requirement 5). A slot is treated as an input port, so 11.1's type
+        # match applies to it; its resolution, phase and Pure Data conditions
+        # are in `references.py` with the binding sections.
+        if kind == "do_while":
+            mi = node.get("max_iterations")
+            frm = mi.get("from") if isinstance(mi, YMap) else None
+            if isinstance(frm, YScalar):
+                got = resolve(frm.text)
+                # An Object-bearing value is reported as `object_in_constant_slot`
+                # (references.py); "not Int" would be a second, derived reason for
+                # the same mistake.
+                if (
+                    got is not None
+                    and got != Atom("Int")
+                    and not is_object_bearing(got, env, rigid)
+                ):
+                    diags.add(
+                        errors.BINDING_TYPE_MISMATCH,
+                        f"max_iterations is {show_type(got)}, not Int",
+                        f"{base}.nodes.{nid}.max_iterations",
+                        at=frm,
+                    )
+
     # A returned value must match the composite output port it is connected to
     # (spec 11.1, 12.3). That port may be typed by one of this composite's own
     # (rigid) parameters, which is why `rigid` is in scope for the match.

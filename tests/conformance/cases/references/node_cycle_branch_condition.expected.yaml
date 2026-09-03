@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: node_dependency_cycle
+    path: "processes.main.body.nodes"
+notes: "The cycle runs through `branch.condition`, which 21.0 classifies as a control section rather than a binding section. An implementation that builds the dependency graph from binding sections alone misses it. Keep this case beside node_cycle_data: passing that one does not imply passing this one."

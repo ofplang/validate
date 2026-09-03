@@ -1,0 +1,19 @@
+spec_version: "0.1"
+processes:
+  step:
+    kind: atomic
+    inputs:
+      k:
+        type: Int
+        phase: graph
+  main:
+    kind: composite
+    body:
+      nodes:
+        - id: n
+          process: step
+          bind:
+            k:
+              value: 3
+      returns: {}
+entry: main
