@@ -5,4 +5,5 @@ errors:
 notes: >-
   A later revision of the same generation. This implementation cannot know what
   the document was written to mean, so reading it by these rules would answer a
-  question that was not asked (spec 2.1).
+  question that was not asked (spec 2.1). The declared MINOR has to stay ahead
+  of `SPEC_VERSION`, so this case moves with it.
