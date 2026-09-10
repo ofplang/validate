@@ -59,7 +59,7 @@ errors:                 # required iff outcome == invalid
   - code: unknown_type  # required; must exist in ofplang/validate/errors.py
     path: "processes.x" # optional location hint (not matched by default)
 warnings:               # optional; see below
-  - code: unbounded_array_output
+  - code: array_output_length_not_derivable
 pending: "reason"       # optional: see below
 notes: "why this is invalid, quoting the spec clause"   # optional
 ```

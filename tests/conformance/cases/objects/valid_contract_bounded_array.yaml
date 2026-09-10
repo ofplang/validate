@@ -1,0 +1,54 @@
+spec_version: "0.0"
+types:
+  Plate96:
+    domain: object
+processes:
+  # A Pure Data `Array` output: the `objects` section describes Object behavior
+  # and this port has no Object slots, so no declaration can relate its length.
+  # The `ensures` clause is the second clause of the 1.1 condition -- the length
+  # is stated against an input's, which the bound computation reaches.
+  measure_all:
+    kind: atomic
+    inputs:
+      plates:
+        type: Array<Plate96>
+        phase: data
+    outputs:
+      plates:
+        type: Array<Plate96>
+        phase: data
+      readings:
+        type: Array<Float>
+        phase: data
+    objects:
+      map:
+        outputs.plates: inputs.plates
+    contracts:
+      ensures:
+        - expr: "outputs.readings.view.length == inputs.plates.view.length"
+  main:
+    kind: composite
+    inputs:
+      plates:
+        type: Array<Plate96>
+        phase: data
+    outputs:
+      plates:
+        type: Array<Plate96>
+        phase: data
+      readings:
+        type: Array<Float>
+        phase: data
+    body:
+      nodes:
+        - id: m
+          process: measure_all
+          state:
+            plates:
+              from: inputs.plates
+      returns:
+        plates:
+          from: m.plates
+        readings:
+          from: m.readings
+entry: main

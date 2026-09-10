@@ -1,6 +1,6 @@
 outcome: valid
 warnings:
-  - code: unbounded_array_output
+  - code: array_output_length_not_derivable
 notes: >-
   Section 14.3 lets `create` name a collection port: an identity appears at
   every Object slot of it, and the declaration does not fix how many (12.4.1).

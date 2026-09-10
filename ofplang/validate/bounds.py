@@ -25,16 +25,33 @@ process's behavior, which the specification trusts rather than proves. A
 document that draws this warning is still portable v0; what it loses is the
 guarantee of 1.1, not validity.
 
-A Pure Data `Array` output always draws it. The `objects` section describes
-Object behavior, and a Pure Data port has no Object slots for it to relate, so
-no derivation is available for one. Bounding it is the second clause of the
-condition -- today a matter for the implementation, since v0 does not read a
-length relation out of `contracts`.
+A Pure Data `Array` output has no *derivation* available: the `objects` section
+describes Object behavior, and a Pure Data port has no Object slots for it to
+relate. Its only route is the second clause, which is why this pass also reads
+`ensures` for a contract that bounds the port's length.
+
+**What a clean run does and does not mean.** The check is neither a proof nor a
+complete detector, and both gaps are deliberate:
+
+  * It under-reports nothing but over-reports plenty. A port genuinely bounded
+    in a shape this pass does not read -- a bound needing algebra to solve for
+    the length, one stated through another output, one held by knowledge of the
+    process and written nowhere -- still draws the warning. Recognising those
+    would mean solving for a variable, which spec 12.4.8 rules out for exactly
+    this kind of reasoning.
+  * Suppression is not verification. A contract is checked at run time (spec
+    9.3), so reading one here says the document *claims* a bound, not that one
+    holds -- the same standing `objects.map` has under 14.1.
+
+So no warnings means "every `Array` output is accounted for, by derivation or
+by claim", not "proved bounded". A warning means "this validator cannot see a
+bound", not "unbounded". The code name says `not_derivable` for that reason.
 """
 
 from __future__ import annotations
 
 from ofplang.validate import errors
+from ofplang.validate.contracts import Binary, Lit, Ref, Unary, parse_expression
 from ofplang.validate.diagnostics import Diagnostics
 
 # `_has_behavior` and `_same_port` are what the `object_identity_map` inference
@@ -62,14 +79,14 @@ def check_array_output_bounds(
         sig = sigs.get(pname)
         if not isinstance(proc, YMap) or sig is None or sig.kind != "atomic":
             continue
-        derivable = _derivable_outputs(proc, sig, env)
+        accounted = _derivable_outputs(proc, sig, env) | _contract_bounded_outputs(proc, sig)
         outputs = proc.get("outputs")
         for port, psig in sig.outputs.items():
-            if not isinstance(psig.type_expr, ArrayT) or port in derivable:
+            if not isinstance(psig.type_expr, ArrayT) or port in accounted:
                 continue
             at = outputs.get(port) if isinstance(outputs, YMap) else proc
             diags.warning(
-                errors.UNBOUNDED_ARRAY_OUTPUT,
+                errors.ARRAY_OUTPUT_LENGTH_NOT_DERIVABLE,
                 f"Array output {port!r} has no derivable length; "
                 "the resource bound of 1.1 holds only if it is bounded by other means",
                 f"processes.{pname}.outputs.{port}",
@@ -142,3 +159,116 @@ def _output_port(path: str) -> str | None:
     """The port named by an `outputs.<port>` Object path (spec 2.6.2), else None."""
     head, sep, port = path.partition(".")
     return port if sep and head == "outputs" and port else None
+
+
+# --- The second clause: a contract that bounds the length -----------------
+# Comparisons that put an upper bound on the left operand, and on the right.
+# `>=` and `!=` appear in neither: a lower bound and a disequality leave the
+# length free above, which is the direction that costs Objects.
+_UPPER_ON_LEFT = frozenset({"==", "<=", "<"})
+_UPPER_ON_RIGHT = frozenset({"==", ">=", ">"})
+
+
+def _contract_bounded_outputs(proc: YMap, sig: ProcSig) -> set[str]:
+    """Output port names an `ensures` clause bounds the length of.
+
+    Only `ensures` is read: a bound is a statement about an output, and
+    `requires` may not refer to one (spec 9.1).
+    """
+    contracts = proc.get("contracts")
+    if not isinstance(contracts, YMap):
+        return set()
+    ensures = contracts.get("ensures")
+    if not isinstance(ensures, YSeq):
+        return set()
+
+    found: set[str] = set()
+    for entry in ensures.items:
+        if not isinstance(entry, YMap):
+            continue
+        expr = entry.get("expr")
+        if not isinstance(expr, YScalar):
+            continue
+        node = parse_expression(expr.text)
+        if node is not None:
+            _collect_bounds(node, sig, found)
+    return found
+
+
+def _collect_bounds(node: object, sig: ProcSig, found: set[str]) -> None:
+    """Add every output port this expression puts an upper bound on.
+
+    `and` is descended because both conjuncts hold, so a bound in either one is
+    a bound. `or` and `not` are not: neither guarantees the operand holds.
+    """
+    if not isinstance(node, Binary):
+        return
+    if node.op == "and":
+        _collect_bounds(node.left, sig, found)
+        _collect_bounds(node.right, sig, found)
+        return
+
+    # The port reference must be one whole side of the comparison. A length
+    # buried in an expression -- `outputs.xss.view.length * n == inputs.xs...`
+    # -- would have to be solved for, and 12.4.8 keeps that kind of algebra out
+    # of this reasoning. Such a port is derivable through `objects.transform`
+    # in every case v0 can write anyway.
+    for op_set, near, far in (
+        (_UPPER_ON_LEFT, node.left, node.right),
+        (_UPPER_ON_RIGHT, node.right, node.left),
+    ):
+        if node.op not in op_set:
+            continue
+        port = _length_ref(near)
+        if port is not None and port in sig.outputs and _reachable(far, sig):
+            found.add(port)
+
+
+def _length_ref(node: object) -> str | None:
+    """The port name of an `outputs.<port>.view.length` reference, else None."""
+    if isinstance(node, Ref) and len(node.path) == 4:
+        head, port, view, field = node.path
+        if head == "outputs" and view == "view" and field == "length":
+            return port
+    return None
+
+
+def _reachable(node: object, sig: ProcSig) -> bool:
+    """Whether the bounding side is built only from quantities the bound
+    computation of spec 1.1 can already reach.
+
+    Two kinds of leaf qualify, and the difference between them is where the
+    number comes from:
+
+    `inputs.<p>.view.length` for an `Array` input port -- reached by the same
+    recursion that is computing this bound, since the traversal follows the
+    graph to whatever was bound to that port. Its phase does not matter: an
+    Object-bearing value is normally `data` phase (spec 6.1), so requiring
+    `run` here would reject the most natural contract there is.
+
+    `inputs.<p>.view` for a Pure Data scalar port fixed no later than `run` --
+    known once the arguments are given, which is when the bound is wanted. A
+    `data` phase scalar is a number computed during the run and reaches nothing.
+
+    An `outputs.*` reference does not qualify. It would make the bound a chain
+    through another port, which this pass does not follow.
+    """
+    if isinstance(node, Lit):
+        return node.type_name in ("Int", "Float")
+    if isinstance(node, Unary):
+        return node.op == "-" and _reachable(node.operand, sig)
+    if isinstance(node, Binary):
+        return node.op in ("+", "-", "*", "/") and (
+            _reachable(node.left, sig) and _reachable(node.right, sig)
+        )
+    if not isinstance(node, Ref) or not node.path or node.path[0] != "inputs":
+        return False
+
+    port = sig.inputs.get(node.path[1]) if len(node.path) > 1 else None
+    if port is None:
+        return False
+    if len(node.path) == 4 and node.path[2:] == ["view", "length"]:
+        return isinstance(port.type_expr, ArrayT)
+    if len(node.path) == 3 and node.path[2] == "view":
+        return not isinstance(port.type_expr, ArrayT) and port.phase in ("graph", "run")
+    return False

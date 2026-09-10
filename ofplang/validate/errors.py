@@ -280,10 +280,10 @@ BAD_CONDITION_TYPE = "bad_condition_type"
 #
 # It is not an error. v0 cannot see into an atomic process (14.1), so whether
 # such a port is bounded in fact is not something validation can decide.
-UNBOUNDED_ARRAY_OUTPUT = "unbounded_array_output"
+ARRAY_OUTPUT_LENGTH_NOT_DERIVABLE = "array_output_length_not_derivable"
 
 #: Advisory codes. A warning never makes a document invalid.
-WARNING_CODES: frozenset[str] = frozenset({UNBOUNDED_ARRAY_OUTPUT})
+WARNING_CODES: frozenset[str] = frozenset({ARRAY_OUTPUT_LENGTH_NOT_DERIVABLE})
 
 
 def _collect_codes() -> frozenset[str]:

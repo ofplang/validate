@@ -1,0 +1,9 @@
+outcome: valid
+warnings:
+  - code: array_output_length_not_derivable
+notes: >-
+  Valid v0 -- a contract may say anything the expression language admits -- but
+  `>=` bounds the length from below and 1.1 needs it bounded from above. The
+  warning is what says this validator can see no upper bound; it is not a claim
+  that none exists, since a bound may be held by knowledge of the process and
+  written nowhere.

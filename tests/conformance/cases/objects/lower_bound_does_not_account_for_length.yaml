@@ -1,0 +1,46 @@
+spec_version: "0.0"
+processes:
+  # The same shape as `valid_contract_bounded_array`, with `>=` in place of
+  # `==`. A lower bound leaves the length free above, which is the direction
+  # that costs Objects, so it does not account for the port.
+  survey:
+    kind: atomic
+    inputs:
+      floor:
+        type: Int
+        phase: run
+    outputs:
+      hits:
+        type: Array<Int>
+        phase: data
+    contracts:
+      ensures:
+        - expr: "outputs.hits.view.length >= inputs.floor.view"
+  report:
+    kind: atomic
+    inputs:
+      hits:
+        type: Array<Int>
+        phase: data
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      floor:
+        type: Int
+        phase: run
+    outputs: {}
+    body:
+      nodes:
+        - id: s
+          process: survey
+          bind:
+            floor:
+              from: inputs.floor
+        - id: r
+          process: report
+          bind:
+            hits:
+              from: s.hits
+      returns: {}
+entry: main

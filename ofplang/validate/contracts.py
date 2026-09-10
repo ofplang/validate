@@ -269,6 +269,28 @@ class _Parser:
         raise ContractError(errors.CONTRACT_PARSE_ERROR, f"unexpected token {t.text!r}")
 
 
+def parse_expression(text: str) -> object | None:
+    """The parse tree of a contract expression, or None if it does not parse.
+
+    For a reader that wants the *shape* of a well-formed expression and has no
+    diagnostic of its own to raise -- the resource-bound pass (spec 1.1) reads
+    `ensures` to see whether a contract bounds an `Array` output's length. A
+    malformed expression is already reported by :func:`check_contracts`, and
+    raising a second finding from the same mistake would give one error two
+    diagnostics, so this returns None and lets the caller stay silent.
+
+    The tree is :class:`Lit`, :class:`Ref`, :class:`Unary` and :class:`Binary`;
+    a `Ref` carries its dotted path already split (`["outputs", "xs", "view",
+    "length"]`). It is *not* resolved or type-checked -- that is what
+    `check_contracts` does with a `ContractCtx` the caller has no reason to
+    build.
+    """
+    try:
+        return _Parser(_lex(text)).parse()
+    except ContractError:
+        return None
+
+
 # --- Resolution context & type checking -----------------------------------
 @dataclass
 class ContractCtx:

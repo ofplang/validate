@@ -1,0 +1,9 @@
+outcome: valid
+warnings: []
+notes: >-
+  The second clause of the 1.1 condition. `readings` is Pure Data, so nothing in
+  `objects` can relate its length -- a contract is the only way to state one,
+  and this states it against an input Array's length, which the bound
+  computation already reaches. Reading the contract is not verifying it: a
+  contract is checked at run time (9.3), so the empty warning list records that
+  the document accounts for the port, not that the bound is proved.

@@ -54,15 +54,34 @@ document invalid and never changes the exit code:
 
 ```
 $ ofp-validate survey.yaml
-survey.yaml:9:23: warning unbounded_array_output  processes.survey.outputs.hits  ...
+survey.yaml:9:23: warning array_output_length_not_derivable  processes.survey.outputs.hits  ...
 all valid (1 file), 1 warning
 ```
 
-The one warning v0 defines is `unbounded_array_output`: an atomic process's
-`Array` output port whose length nothing in the document relates to its inputs.
-Spec 1.1 makes its resource bound conditional on there being no such port, so a
-run with no warnings is one whose Object count has an upper bound computable
-once the run-phase arguments are given.
+The one warning defined today is `array_output_length_not_derivable`: an atomic
+process's `Array` output port whose length nothing in the document relates to
+its inputs. Spec 1.1 makes its resource bound conditional on there being no
+such port.
+
+A port is accounted for by `objects.map` / `objects.transform` /
+`object_identity_map`, which relate its length to an input's, or by an
+`ensures` clause that bounds its `.view.length` from above against something
+reachable — an input Array's length, a `run` phase scalar, a literal, or
+arithmetic over those:
+
+```yaml
+contracts:
+  ensures:
+    - expr: "outputs.readings.view.length == inputs.plates.view.length"
+```
+
+**What a clean run means.** No warnings says every `Array` output is accounted
+for, by derivation or by claim — not that a bound is proved. A contract is
+checked at run time (spec 9.3), so reading one here trusts it the way spec 14.1
+trusts an `objects.map`. And a warning says this validator can see no bound,
+not that none exists: a bound needing algebra to solve for the length, one
+stated through another output, or one held by knowledge of the process still
+draws it.
 
 This tool is also the `validate` subcommand of the umbrella `ofp` CLI
 ([`ofplang`](https://pypi.org/project/ofplang/)), which forwards to it in-process:
