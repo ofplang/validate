@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 from ofplang.validate import validate
-from ofplang.validate.validator import EXTENSION_TOLERANT, STRICT, ValidationResult
+from ofplang.validate.validator import ERROR, EXTENSION_TOLERANT, STRICT, ValidationResult
 from ofplang.validate.version import SPEC_VERSION
 
 # Exit codes are part of the CLI contract (scripts/CI depend on them).
@@ -37,6 +37,7 @@ EXIT_USAGE = 2
 # ANSI colors, applied only when writing to a TTY and not disabled.
 _RED = "\033[31m"
 _GREEN = "\033[32m"
+_YELLOW = "\033[33m"
 _DIM = "\033[2m"
 _RESET = "\033[0m"
 
@@ -104,43 +105,66 @@ def _render_text(results: list[tuple[str, ValidationResult]], quiet: bool, color
 
     lines: list[str] = []
     total_errors = 0
+    total_warnings = 0
     invalid_files = 0
     multi = len(results) > 1
 
+    def emit(path: str, diags, header_shown: bool) -> bool:
+        """Print one file's diagnostics, writing the `path:` header on demand."""
+        if quiet or not diags:
+            return header_shown
+        if multi and not header_shown:
+            lines.append(f"{path}:")
+            header_shown = True
+        for d in diags:
+            # Prefer a concrete source position as the locator; fall back to
+            # the logical path. When both exist, show the path as a dim
+            # trailing detail (position primary, path for context).
+            if d.location:
+                locator = d.location
+                detail = f"  {c(d.path, _DIM)}" if d.path else ""
+            else:
+                locator = d.path or "<root>"
+                detail = ""
+            msg = f"  {d.message}" if d.message else ""
+            indent = "  " if multi else ""
+            label = c("error", _RED) if d.severity == ERROR else c("warning", _YELLOW)
+            lines.append(f"{indent}{locator}: {label} {d.code}{detail}{msg}")
+        return header_shown
+
     for path, result in results:
-        if result.ok:
-            # Only announce OK files explicitly when validating several, so
+        errs, warns = result.errors, result.warnings
+        total_errors += len(errs)
+        total_warnings += len(warns)
+        if errs:
+            invalid_files += 1
+        elif not warns:
+            # Only announce clean files explicitly when validating several, so
             # single-file runs stay terse.
             if not quiet and multi:
                 lines.append(f"{path}: {c('OK', _GREEN)}")
             continue
-        invalid_files += 1
-        total_errors += len(result.diagnostics)
-        if multi:
-            lines.append(f"{path}:")
-        if not quiet:
-            for d in result.diagnostics:
-                # Prefer a concrete source position as the locator; fall back to
-                # the logical path. When both exist, show the path as a dim
-                # trailing detail (position primary, path for context).
-                if d.location:
-                    locator = d.location
-                    detail = f"  {c(d.path, _DIM)}" if d.path else ""
-                else:
-                    locator = d.path or "<root>"
-                    detail = ""
-                msg = f"  {d.message}" if d.message else ""
-                indent = "  " if multi else ""
-                lines.append(f"{indent}{locator}: {c('error', _RED)} {d.code}{detail}{msg}")
+        header_shown = emit(path, errs, False)
+        emit(path, warns, header_shown)
 
+    # A warning does not make a run fail, so the summary keeps the two apart:
+    # the headline says whether the documents are valid, and the warning count
+    # is appended to whichever headline that is.
+    suffix = (
+        c(f", {total_warnings} warning{'s' if total_warnings != 1 else ''}", _YELLOW)
+        if total_warnings
+        else ""
+    )
     if total_errors == 0:
         lines.append(
             c(f"all valid ({len(results)} file{'s' if len(results) != 1 else ''})", _GREEN)
+            + suffix
         )
     else:
         lines.append(
             c(f"{total_errors} error{'s' if total_errors != 1 else ''} in "
               f"{invalid_files} of {len(results)} file{'s' if len(results) != 1 else ''}", _RED)
+            + suffix
         )
     return "\n".join(lines)
 
@@ -156,6 +180,7 @@ def _render_json(results: list[tuple[str, ValidationResult]]) -> str:
                 "diagnostics": [
                     {
                         "code": d.code,
+                        "severity": d.severity,
                         "path": d.path,
                         "message": d.message,
                         "file": d.file,

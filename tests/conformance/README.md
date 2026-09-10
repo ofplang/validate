@@ -58,9 +58,26 @@ match: exact            # optional: exact | superset (default: exact)
 errors:                 # required iff outcome == invalid
   - code: unknown_type  # required; must exist in ofplang/validate/errors.py
     path: "processes.x" # optional location hint (not matched by default)
+warnings:               # optional; see below
+  - code: unbounded_array_output
 pending: "reason"       # optional: see below
 notes: "why this is invalid, quoting the spec clause"   # optional
 ```
+
+### Warnings
+
+A warning reports something the specification states as a condition rather than
+as a rule, so it never makes a document invalid. `warnings` is therefore
+independent of `outcome`: a `valid` case may list some, and an `invalid` one
+may too.
+
+- **Omitted**: warnings are not checked. Existing cases need no change.
+- **Present**: matched **exactly**, including `warnings: []`, which pins that a
+  document draws none. Use the empty form where "no warning here" is part of
+  what the case is demonstrating.
+
+Codes must be members of `WARNING_CODES` in `ofplang/validate/errors.py`, which
+is disjoint from `ERROR_CODES`.
 
 ### Pending cases (tests ahead of implementation)
 

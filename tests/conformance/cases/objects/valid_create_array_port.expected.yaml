@@ -1,0 +1,10 @@
+outcome: valid
+warnings:
+  - code: unbounded_array_output
+notes: >-
+  Section 14.3 lets `create` name a collection port: an identity appears at
+  every Object slot of it, and the declaration does not fix how many (12.4.1).
+  The document is valid v0 -- nothing forbids this -- but the number of Objects
+  is reachable from nothing in it, so the resource-bound condition of 1.1 does
+  not hold and the port is reported as advisory. Object tracking is unaffected:
+  the port has exactly one provenance and the collection is consumed once.

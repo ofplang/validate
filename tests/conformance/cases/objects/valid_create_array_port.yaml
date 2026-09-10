@@ -1,0 +1,54 @@
+spec_version: "0.0"
+types:
+  Cup:
+    domain: object
+processes:
+  # `create` naming a collection port. Spec 14.3: a new identity appears at
+  # every Object slot of the port, and for a collection port the declaration
+  # does not fix how many. The number is therefore not reachable from anything
+  # in the document, which is the resource-bound condition of 1.1 failing --
+  # advisory, not an error, because v0 cannot see into an atomic process (14.1).
+  cups_create:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: run
+    outputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    objects:
+      create:
+        - outputs.cups
+  cups_use:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cups
+  main:
+    kind: composite
+    inputs:
+      n:
+        type: Int
+        phase: run
+    outputs: {}
+    body:
+      nodes:
+        - id: make
+          process: cups_create
+          bind:
+            n:
+              from: inputs.n
+        - id: use
+          process: cups_use
+          state:
+            cups:
+              from: make.cups
+      returns: {}
+entry: main

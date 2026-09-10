@@ -24,6 +24,13 @@ STRICT = "strict"
 EXTENSION_TOLERANT = "extension-tolerant"
 MODES = frozenset({STRICT, EXTENSION_TOLERANT})
 
+# Diagnostic severities. A warning reports something the specification states as
+# a condition rather than as a rule -- the resource bound of spec 1.1 is the one
+# v0 has -- so it never makes a document invalid. Same vocabulary as the sibling
+# ofplang-schedule validator, so the two read alike.
+ERROR = "error"
+WARNING = "warning"
+
 
 @dataclass(frozen=True)
 class Diagnostic:
@@ -33,6 +40,7 @@ class Diagnostic:
     optional human-oriented logical location (e.g. ``processes.main.inputs.x``).
     ``file``/``line``/``col`` are the source position when known (1-based); they
     are optional so passes that cannot supply a node position still work.
+    ``severity`` is :data:`ERROR` unless the finding is advisory.
     """
 
     code: str
@@ -41,6 +49,7 @@ class Diagnostic:
     file: str | None = None
     line: int | None = None
     col: int | None = None
+    severity: str = ERROR
 
     @property
     def location(self) -> str | None:
@@ -64,11 +73,28 @@ class ValidationResult:
 
     @property
     def ok(self) -> bool:
-        return not self.diagnostics
+        # Valid iff nothing of error severity was reported. A warning describes a
+        # condition the specification states outside its validation rules, so a
+        # document that draws one is still portable v0.
+        return not any(d.severity == ERROR for d in self.diagnostics)
+
+    @property
+    def errors(self) -> list[Diagnostic]:
+        return [d for d in self.diagnostics if d.severity == ERROR]
+
+    @property
+    def warnings(self) -> list[Diagnostic]:
+        return [d for d in self.diagnostics if d.severity == WARNING]
 
     @property
     def codes(self) -> list[str]:
-        return [d.code for d in self.diagnostics]
+        """Error codes only, so this agrees with :attr:`ok`. Warnings are
+        :attr:`warning_codes`."""
+        return [d.code for d in self.diagnostics if d.severity == ERROR]
+
+    @property
+    def warning_codes(self) -> list[str]:
+        return [d.code for d in self.diagnostics if d.severity == WARNING]
 
 
 def validate(
@@ -110,6 +136,7 @@ def validate(
     # Imported lazily so this module has no import-time dependency on PyYAML or
     # the pass modules — keeps the public API cheap to import.
     from ofplang.validate import bindings as bindings_pass
+    from ofplang.validate import bounds as bounds_pass
     from ofplang.validate import contracts as contracts_pass
     from ofplang.validate import duplicates as duplicates_pass
     from ofplang.validate import entry as entry_pass
@@ -195,6 +222,9 @@ def validate(
         bindings_pass.check_bindings(root, diags, sigs, env)
         contracts_pass.check_contracts(root, diags, env)
         scheduling_pass.check_scheduling(root, diags, mode, sigs)
+        # Advisory, and last: the resource-bound condition of spec 1.1 is not a
+        # validation rule, so it neither gates nor is gated by the passes above.
+        bounds_pass.check_array_output_bounds(root, diags, sigs, env)
 
     # Entry process resolution and process-dependency acyclicity.
     entry_pass.check_entry(root, diags)

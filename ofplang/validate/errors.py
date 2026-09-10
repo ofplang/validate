@@ -265,6 +265,27 @@ ARG_TYPE_MISMATCH = "arg_type_mismatch"
 BAD_CONDITION_TYPE = "bad_condition_type"
 
 
+# --- Advisory codes (spec 1.1) --------------------------------------------
+# A warning reports something the specification states as a *condition* rather
+# than as a rule, so a document that draws one is still portable v0.
+#
+# An atomic process's `Array` output port whose length nothing in the document
+# relates to its inputs. Spec 1.1 makes the resource bound conditional on every
+# such port having a length that is derivable -- from `objects.map` (14.1),
+# `objects.transform` (14.4), or the `object_identity_map` inference (15) -- or
+# bounded by something v0 does not check. This code reports the ports that meet
+# neither, which is exactly the condition failing: a document that draws none is
+# one whose Object count has an upper bound computable once the run phase
+# arguments are given.
+#
+# It is not an error. v0 cannot see into an atomic process (14.1), so whether
+# such a port is bounded in fact is not something validation can decide.
+UNBOUNDED_ARRAY_OUTPUT = "unbounded_array_output"
+
+#: Advisory codes. A warning never makes a document invalid.
+WARNING_CODES: frozenset[str] = frozenset({UNBOUNDED_ARRAY_OUTPUT})
+
+
 def _collect_codes() -> frozenset[str]:
     codes = set()
     for name, value in globals().items():
@@ -275,4 +296,7 @@ def _collect_codes() -> frozenset[str]:
 
 #: Every error code known to the specification vocabulary. Conformance
 #: fixtures may only reference codes in this set.
-ERROR_CODES: frozenset[str] = _collect_codes()
+ERROR_CODES: frozenset[str] = _collect_codes() - WARNING_CODES
+
+#: Errors and warnings together -- what a fixture may name at all.
+ALL_CODES: frozenset[str] = ERROR_CODES | WARNING_CODES

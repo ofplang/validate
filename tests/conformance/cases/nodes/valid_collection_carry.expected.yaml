@@ -1,0 +1,11 @@
+outcome: valid
+warnings: []
+notes: >-
+  A fold whose carry is an Object-bearing collection. Section 16 permits it:
+  the carry value may be Pure Data or Object-bearing, and here the target
+  consumes the carried input and creates the same-name output, which is the
+  second of the two arrangements 16 allows. The composite's skeleton is that
+  replacement even though the consumption and creation happen per element
+  inside the map (12.4.5). No warning: every `Array` output in the document
+  belongs to a composite or is derivable, so the condition of 1.1 holds and
+  the Object count is bounded by the traversal lengths.

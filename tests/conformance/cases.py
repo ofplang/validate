@@ -19,6 +19,12 @@ Expected-outcome schema (``*.expected.yaml`` / ``expected.yaml``)::
     errors:                 # required iff outcome == invalid
       - code: unknown_key   # required; must be a member of ofplang.validate.errors.ERROR_CODES
         path: "..."         # optional location hint (not matched by default)
+    warnings:               # optional, and independent of `outcome`: a warning never
+      - code: ...           #   makes a document invalid. Omit it and warnings are not
+                            #   checked at all, so existing cases need no change. Present
+                            #   (even as an empty list) it is matched exactly, which is
+                            #   how a case pins "this draws exactly these warnings" or
+                            #   "this draws none".
     pending: "reason"       # optional: this case documents behavior the validator
                             #   does not satisfy yet (spec area not implemented, or a
                             #   known false positive). Marked xfail so the suite stays
@@ -33,7 +39,7 @@ from pathlib import Path
 
 import yaml
 
-from ofplang.validate.errors import ERROR_CODES
+from ofplang.validate.errors import ERROR_CODES, WARNING_CODES
 
 VALID = "valid"
 INVALID = "invalid"
@@ -57,6 +63,10 @@ class Case:
     outcome: str
     match: str
     expected_codes: tuple[str, ...]
+    # None when the fixture omits `warnings` entirely, which means "do not check
+    # them". A tuple (possibly empty) means "these exactly", so a case can pin
+    # either the warnings a document draws or that it draws none.
+    expected_warnings: tuple[str, ...] | None
     pending: str  # non-empty when this case is a known-not-yet-satisfied target
     notes: str
 
@@ -78,7 +88,9 @@ def _load_expected(expected_path: Path, case_id: str) -> dict:
 def _build_case(case_id: str, root_doc: Path, expected_path: Path) -> Case:
     data = _load_expected(expected_path, case_id)
 
-    unknown = set(data) - {"mode", "outcome", "match", "errors", "pending", "notes"}
+    unknown = set(data) - {
+        "mode", "outcome", "match", "errors", "warnings", "pending", "notes"
+    }
     if unknown:
         raise CaseError(f"[{case_id}] unknown expected keys: {sorted(unknown)}")
 
@@ -112,6 +124,27 @@ def _build_case(case_id: str, root_doc: Path, expected_path: Path) -> Case:
             )
         codes.append(code)
 
+    # `warnings` is independent of `outcome`: a warning never makes a document
+    # invalid, so a valid case may list some and an invalid one may too. Absent
+    # means "not checked"; present means "exactly these".
+    warnings: tuple[str, ...] | None = None
+    if "warnings" in data:
+        entries = data["warnings"] or []
+        if not isinstance(entries, list):
+            raise CaseError(f"[{case_id}] 'warnings' must be a list")
+        wcodes: list[str] = []
+        for entry in entries:
+            if not isinstance(entry, dict) or "code" not in entry:
+                raise CaseError(f"[{case_id}] each warning entry needs a 'code'")
+            code = entry["code"]
+            if code not in WARNING_CODES:
+                raise CaseError(
+                    f"[{case_id}] unknown warning code {code!r}; "
+                    f"add it to ofplang.validate.errors.WARNING_CODES if it is a real one"
+                )
+            wcodes.append(code)
+        warnings = tuple(wcodes)
+
     if not root_doc.exists():
         raise CaseError(f"[{case_id}] missing root document: {root_doc}")
 
@@ -122,6 +155,7 @@ def _build_case(case_id: str, root_doc: Path, expected_path: Path) -> Case:
         outcome=outcome,
         match=match,
         expected_codes=tuple(codes),
+        expected_warnings=warnings,
         pending=str(data.get("pending", "")),
         notes=str(data.get("notes", "")),
     )

@@ -80,9 +80,26 @@ def _run(case: Case):
         pytest.xfail("validator raised NotImplementedError")
 
 
+def _assert_warnings(case: Case, result) -> None:
+    """Check `warnings` when the fixture lists them. A warning never makes a
+    document invalid, so this is asserted independently of the outcome, and a
+    fixture that omits the key is not checked at all."""
+    if case.expected_warnings is None:
+        return
+    produced = set(result.warning_codes)
+    expected = set(case.expected_warnings)
+    assert produced == expected, (
+        f"warning code set mismatch\n  expected: {sorted(expected)}\n"
+        f"  produced: {sorted(produced)}"
+        + (f"\nnote: {case.notes}" if case.notes else "")
+    )
+
+
 def _assert_outcome(case: Case, result) -> None:
     produced = set(result.codes)
     expected = set(case.expected_codes)
+
+    _assert_warnings(case, result)
 
     if case.outcome == VALID:
         assert result.ok, (

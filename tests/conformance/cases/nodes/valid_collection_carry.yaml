@@ -1,0 +1,109 @@
+spec_version: "0.0"
+features:
+  - node_map
+  - node_fold
+types:
+  Cup:
+    domain: object
+processes:
+  # Element-wise replacement: one Cup consumed, one created. Both ports are
+  # depth 0, so the declaration fixes the count at one.
+  cup_swap:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      consume:
+        - inputs.cup
+      create:
+        - outputs.cup
+  cup_create:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      create:
+        - outputs.cup
+  cups_use:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.cups
+  # The fold target. Its carry port is an Object-bearing collection, and its
+  # body maps over that very collection, so the map's traversal length is the
+  # carry's own width and the width is preserved across iterations.
+  swap_all:
+    kind: composite
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+      step:
+        type: Int
+        phase: data
+    outputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    body:
+      nodes:
+        - id: m
+          kind: map
+          process: cup_swap
+          each:
+            cup:
+              from: inputs.cups
+      returns:
+        cups:
+          from: m.cup
+  main:
+    kind: composite
+    inputs:
+      steps:
+        type: Array<Int>
+        phase: data
+    outputs: {}
+    body:
+      nodes:
+        - id: seed
+          kind: map
+          process: cup_create
+          each:
+            n:
+              value: [0, 1, 2]
+        - id: loop
+          kind: fold
+          process: swap_all
+          carry:
+            cups:
+              from: seed.cup
+          each:
+            step:
+              from: inputs.steps
+          outputs:
+            cups:
+              mode: carry
+        - id: use
+          process: cups_use
+          state:
+            cups:
+              from: loop.cups
+      returns: {}
+entry: main

@@ -13,7 +13,7 @@ stays in one place.
 
 from __future__ import annotations
 
-from ofplang.validate.validator import Diagnostic, ValidationResult
+from ofplang.validate.validator import ERROR, WARNING, Diagnostic, ValidationResult
 
 
 class Diagnostics:
@@ -25,7 +25,12 @@ class Diagnostics:
         self._items: list[Diagnostic] = []
 
     def add(
-        self, code: str, message: str = "", path: str | None = None, at=None
+        self,
+        code: str,
+        message: str = "",
+        path: str | None = None,
+        at=None,
+        severity: str = ERROR,
     ) -> Diagnostic:
         """Record a finding. Returns it so callers can reference/inspect it.
 
@@ -39,9 +44,18 @@ class Diagnostics:
             file = getattr(pos, "file", None)
             line = getattr(pos, "line", None)
             col = getattr(pos, "col", None)
-        diag = Diagnostic(code=code, message=message, path=path, file=file, line=line, col=col)
+        diag = Diagnostic(
+            code=code, message=message, path=path, file=file, line=line, col=col,
+            severity=severity,
+        )
         self._items.append(diag)
         return diag
+
+    def warning(
+        self, code: str, message: str = "", path: str | None = None, at=None
+    ) -> Diagnostic:
+        """Record an advisory finding. A warning never makes a document invalid."""
+        return self.add(code, message, path, at, severity=WARNING)
 
     def has(self, code: str) -> bool:
         """Whether any recorded finding carries ``code``.
@@ -58,7 +72,13 @@ class Diagnostics:
 
     @property
     def codes(self) -> list[str]:
-        return [d.code for d in self._items]
+        """Error codes only, matching ``ValidationResult.codes``. A pass that
+        asserts "nothing went wrong" means errors; a warning is not a failure."""
+        return [d.code for d in self._items if d.severity == ERROR]
+
+    @property
+    def warning_codes(self) -> list[str]:
+        return [d.code for d in self._items if d.severity == WARNING]
 
     def result(self) -> ValidationResult:
         """Freeze the collected findings into the public result object."""

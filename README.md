@@ -48,6 +48,22 @@ Diagnostics carry a `file:line:col` source position (an imported fragment's own
 file when the problem is inside an `$import`); `--format json` includes
 `file`/`line`/`col` fields.
 
+A finding is an **error** or a **warning**. A warning reports something the
+specification states as a condition rather than as a rule, so it never makes a
+document invalid and never changes the exit code:
+
+```
+$ ofp-validate survey.yaml
+survey.yaml:9:23: warning unbounded_array_output  processes.survey.outputs.hits  ...
+all valid (1 file), 1 warning
+```
+
+The one warning v0 defines is `unbounded_array_output`: an atomic process's
+`Array` output port whose length nothing in the document relates to its inputs.
+Spec 1.1 makes its resource bound conditional on there being no such port, so a
+run with no warnings is one whose Object count has an upper bound computable
+once the run-phase arguments are given.
+
 This tool is also the `validate` subcommand of the umbrella `ofp` CLI
 ([`ofplang`](https://pypi.org/project/ofplang/)), which forwards to it in-process:
 `ofp validate doc.yaml` is the command above, with the same options and the same
@@ -65,9 +81,14 @@ if not result.ok:
 ```
 
 `validate(source, *, mode="strict")` returns a `ValidationResult` with `.ok` and
-`.diagnostics` (each a `Diagnostic(code, message, path, file, line, col)`). The
-validator collects all independent findings rather than stopping at the first;
-only a YAML parse or `$import` resolution failure is terminal.
+`.diagnostics` (each a `Diagnostic(code, message, path, file, line, col,
+severity)`). The validator collects all independent findings rather than
+stopping at the first; only a YAML parse or `$import` resolution failure is
+terminal.
+
+`.ok` and `.codes` look at errors alone, so a document that draws only warnings
+is valid. `.errors` / `.warnings` split the diagnostics by severity, and
+`.warning_codes` is the warning counterpart of `.codes`.
 
 `source` is a path **or an already-loaded document** (a mapping), so a caller that
 builds one in memory — a generator, a notebook, a tool that rewrote a document
