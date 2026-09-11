@@ -99,6 +99,11 @@ class PortSig:
     type_expr: TypeExpr | None
     object_bearing: bool
     phase: str | None = None
+    # Whether the declared type resolved. `object_bearing` is False for a type
+    # that did not, so "Pure Data" and "unknown" are otherwise the same answer,
+    # and a rule that fires on Pure Data would fire a second time on every name
+    # error the type pass has already reported.
+    resolved: bool = True
 
 
 @dataclass
@@ -127,18 +132,22 @@ def _port_sigs(ports: YNode | None, env: TypeEnv, tp: dict[str, str]) -> dict[st
         expr = None
         ob = False
         phase = None
+        resolved = False
         if isinstance(port, YMap):
             tnode = port.get("type")
             if isinstance(tnode, YScalar) and tnode.is_str:
                 try:
                     expr = parse_type(tnode.text)
                     ob = is_object_bearing(expr, env, tp)
+                    resolved = resolve_error(expr, env, tp) is None
                 except TypeParseError:
                     expr = None
             pnode = port.get("phase")
             if isinstance(pnode, YScalar) and not pnode.is_null:
                 phase = pnode.text
-        out[name] = PortSig(type_expr=expr, object_bearing=ob, phase=phase)
+        out[name] = PortSig(
+            type_expr=expr, object_bearing=ob, phase=phase, resolved=resolved
+        )
     return out
 
 
@@ -300,17 +309,19 @@ def _validate_transform_entry(
     if any_missing:
         return
 
-    # 3. Every referenced path must be Object-bearing (spec 14.4.1).
+    # 3. Every referenced path must be Object-bearing (spec 14).
     all_ports_ob = True
     for role_map, side in ((in_roles, "inputs"), (out_roles, "outputs")):
         ports = sig.inputs if side == "inputs" else sig.outputs
         for val in role_map.values():
             if isinstance(val, YScalar):
                 parsed = _parse_path(val.text)
-                if parsed and parsed[1] in ports and not ports[parsed[1]].object_bearing:
-                    all_ports_ob = False
+                if parsed and parsed[1] in ports:
+                    port = ports[parsed[1]]
+                    if port.resolved and not port.object_bearing:
+                        all_ports_ob = False
     if not all_ports_ob:
-        diags.add(errors.PURE_DATA_IN_TRANSFORM, "transform path is Pure Data", base, at=entry)
+        diags.add(errors.PURE_DATA_IN_OBJECTS, "transform path is Pure Data", base, at=entry)
         return
 
     # 4. Role typing (spec 14.4.1): each role must be bound to an Array nested to
@@ -487,10 +498,33 @@ def _check_atomic(
         ports = sig.inputs if side == "inputs" else sig.outputs
         return port in ports
 
+    def _is_pure_data(parsed: tuple[str, str] | None) -> bool:
+        """Whether an existing path names a Pure Data port (spec 14).
+
+        Only meaningful once `_exists` has passed. Every `objects` declaration
+        is defined over the named port's Object slots, and a Pure Data port has
+        none, so the entry declares nothing -- and, having no slot, is never
+        reached by the completeness check below. Unreported, it is dropped in
+        silence.
+        """
+        if parsed is None:
+            return False
+        side, port = parsed
+        ports = sig.inputs if side == "inputs" else sig.outputs
+        return ports[port].resolved and not ports[port].object_bearing
+
     def _not_found(text: str, path: str, at) -> None:
         diags.add(
             errors.OBJECTS_PATH_NOT_FOUND,
             f"objects path {text!r} does not name a declared port",
+            path,
+            at=at,
+        )
+
+    def _pure_data(text: str, path: str, at) -> None:
+        diags.add(
+            errors.PURE_DATA_IN_OBJECTS,
+            f"objects path {text!r} names a Pure Data port",
             path,
             at=at,
         )
@@ -502,21 +536,35 @@ def _check_atomic(
             for out_path in map_node.keys():
                 src = map_node.get(out_path)
                 op = _parse_path(out_path)
+                # Each side is judged on its own, so a bad target does not also
+                # leave a good source unaccounted: the entry still claims the
+                # Object slot it names, as a transform entry does.
+                bad_out = True
                 if not _exists(op):
                     _not_found(
                         out_path,
                         f"{base}.objects.map.{out_path}",
                         map_node.key_node(out_path),
                     )
-                elif op is not None and op[0] == "outputs" and op[1] in provs:
-                    provs[op[1]] += 1
+                elif _is_pure_data(op):
+                    _pure_data(
+                        out_path,
+                        f"{base}.objects.map.{out_path}",
+                        map_node.key_node(out_path),
+                    )
+                else:
+                    bad_out = False
+                    if op is not None and op[0] == "outputs" and op[1] in provs:
+                        provs[op[1]] += 1
                 if isinstance(src, YScalar):
                     ip = _parse_path(src.text)
                     if not _exists(ip):
                         _not_found(src.text, f"{base}.objects.map.{out_path}", src)
+                    elif _is_pure_data(ip):
+                        _pure_data(src.text, f"{base}.objects.map.{out_path}", src)
                     elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
-                        if op is not None and op[0] == "outputs":
+                        if not bad_out and op is not None and op[0] == "outputs":
                             phi[ip[1]] = (op[1], skeleton.IDENTITY)
                             # The two ports must have the same resolved type
                             # (spec 14.1): `object_slots` corresponds only then,
@@ -538,6 +586,8 @@ def _check_atomic(
                     ip = _parse_path(item.text)
                     if not _exists(ip):
                         _not_found(item.text, f"{base}.objects.consume", item)
+                    elif _is_pure_data(ip):
+                        _pure_data(item.text, f"{base}.objects.consume", item)
                     elif ip is not None and ip[0] == "inputs" and ip[1] in fates:
                         fates[ip[1]] += 1
                         consumed.add(ip[1])
@@ -550,6 +600,8 @@ def _check_atomic(
                     op = _parse_path(item.text)
                     if not _exists(op):
                         _not_found(item.text, f"{base}.objects.create", item)
+                    elif _is_pure_data(op):
+                        _pure_data(item.text, f"{base}.objects.create", item)
                     elif op is not None and op[0] == "outputs" and op[1] in provs:
                         provs[op[1]] += 1
                         created.add(op[1])

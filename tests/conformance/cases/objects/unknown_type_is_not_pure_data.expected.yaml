@@ -1,0 +1,6 @@
+outcome: invalid
+match: exact
+errors:
+  - code: unknown_type
+    path: "processes.bad.outputs.x.type"
+notes: "A type that does not resolve is not Object-bearing, but it is not Pure Data either -- it is unknown, and the type pass has already said so. pure_data_in_objects must not be reported on top of it, or every name error on an Object port would be counted twice."

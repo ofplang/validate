@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: pure_data_in_objects
+    path: "processes.bad.objects.consume"
+notes: "consume ends an input Object identity (14.2); a Pure Data input has none to end (spec 14)."

@@ -1,0 +1,17 @@
+spec_version: "0.0"
+processes:
+  bad:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs: {}
+    objects:
+      consume:
+        - inputs.n
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

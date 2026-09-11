@@ -1,0 +1,17 @@
+spec_version: "0.0"
+processes:
+  bad:
+    kind: atomic
+    inputs: {}
+    outputs:
+      x:
+        type: Nonesuch
+        phase: data
+    objects:
+      create:
+        - outputs.x
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

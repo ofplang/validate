@@ -1,0 +1,20 @@
+spec_version: "0.0"
+processes:
+  bad:
+    kind: atomic
+    inputs:
+      a:
+        type: Int
+        phase: data
+    outputs:
+      b:
+        type: String
+        phase: data
+    objects:
+      map:
+        outputs.b: inputs.a
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

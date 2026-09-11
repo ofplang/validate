@@ -1,0 +1,6 @@
+outcome: invalid
+match: exact
+errors:
+  - code: pure_data_in_objects
+    path: "processes.bad.objects.map.outputs.n"
+notes: "One mistake, one diagnostic. The target is Pure Data and is reported; the Object-bearing source still counts as mapped, so incomplete_objects is not also raised for inputs.cup. No correspondence is recorded, since there is no output slot to record one to. This shape was already an error before the rule existed, but as objects_map_type_mismatch: the source being Object-bearing was what reached the 14.1 type check at all, which is why the all-Pure-Data case next door passed in silence."

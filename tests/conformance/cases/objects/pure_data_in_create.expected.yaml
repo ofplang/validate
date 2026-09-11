@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: pure_data_in_objects
+    path: "processes.bad.objects.create"
+notes: "create introduces an identity at every Object slot of the named output port (14.3), and a Pure Data port has none (5.2). The real Object output cup is created, so nothing is incomplete and the stray entry is the only report -- which is the case that used to pass in silence."

@@ -134,6 +134,13 @@ MULTIPLE_PROVENANCES = "multiple_provenances"
 # the identity of another, between ports whose Object slots do not correspond.
 OBJECTS_MAP_TYPE_MISMATCH = "objects_map_type_mismatch"
 OBJECTS_PATH_NOT_FOUND = "objects_path_not_found"
+# An `objects` path naming a Pure Data port (spec 14). All four declarations
+# are defined over Object slots and a Pure Data port has none, so the entry
+# says nothing and completeness never reaches it. Renamed from
+# `pure_data_in_transform` in 0.2, when the rule stopped being a transform rule:
+# 14.4.1 stated it only of `transform`, and `map` / `consume` / `create` passed
+# such a path in silence.
+PURE_DATA_IN_OBJECTS = "pure_data_in_objects"
 DATA_INDEGREE = "data_indegree"
 OBJECT_VIA_BIND = "object_via_bind"
 
@@ -141,7 +148,6 @@ OBJECT_VIA_BIND = "object_via_bind"
 UNKNOWN_TRANSFORM_KIND = "unknown_transform_kind"
 INVALID_TRANSFORM_ROLES = "invalid_transform_roles"
 TRANSFORM_ROLE_TYPE_MISMATCH = "transform_role_type_mismatch"
-PURE_DATA_IN_TRANSFORM = "pure_data_in_transform"
 
 # --- Structured nodes (spec 16-21) ----------------------------------------
 CARRY_OUTPUT_MISSING = "carry_output_missing"

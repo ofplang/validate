@@ -1,5 +1,5 @@
 outcome: invalid
 errors:
-  - code: pure_data_in_transform
+  - code: pure_data_in_objects
     path: "processes.bad.objects.transform[0]"
-notes: "All transform paths must be Object-bearing; Array<Int> is Pure Data (spec 14.4.1)."
+notes: "Every objects path must be Object-bearing; Array<Int> is Pure Data (spec 14)."

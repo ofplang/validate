@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: pure_data_in_objects
+    path: "processes.bad.objects.map.outputs.b"
+notes: "Both sides are Pure Data, so both are reported (spec 14). The types also differ, and 14.1 requires them to match, but that check never ran: it was reached only through the fate counting, which no Pure Data port enters. One entry, two paths, and objects_map_type_mismatch is not among the codes."
