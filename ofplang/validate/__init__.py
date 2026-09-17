@@ -1,9 +1,11 @@
 """ofplang.validate -- validator for Object-flow Programming Language v0."""
 
 from ofplang.validate.validator import (
+    ERROR,
     EXTENSION_TOLERANT,
     MODES,
     STRICT,
+    WARNING,
     Diagnostic,
     ValidationResult,
     expand,
@@ -20,4 +22,6 @@ __all__ = [
     "STRICT",
     "EXTENSION_TOLERANT",
     "MODES",
+    "ERROR",
+    "WARNING",
 ]

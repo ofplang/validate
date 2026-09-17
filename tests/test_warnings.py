@@ -20,10 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from ofplang.validate import validate
+from ofplang.validate import ERROR, WARNING, validate
 from ofplang.validate.cli import EXIT_OK, main
 from ofplang.validate.errors import ARRAY_OUTPUT_LENGTH_NOT_DERIVABLE, ERROR_CODES, WARNING_CODES
-from ofplang.validate.validator import ERROR, WARNING
 
 CASES = Path(__file__).parent / "conformance" / "cases"
 # `create` on an `Array<Cup>` port: valid v0, but the count is reachable from
@@ -32,6 +31,16 @@ UNBOUNDED = str(CASES / "objects" / "valid_create_array_port.yaml")
 # A fold carrying an Object-bearing collection: every length traces to a
 # traversal, so the condition of 1.1 holds and nothing is reported.
 BOUNDED = str(CASES / "nodes" / "valid_collection_carry.yaml")
+
+
+def test_severity_constants_are_public() -> None:
+    # A caller that reads `Diagnostic.severity` needs the two values to compare it
+    # against, so they belong in the package namespace rather than in `validator`.
+    # `ofplang-schedule` exports its own pair this way and the two read alike.
+    import ofplang.validate as api
+
+    assert (api.ERROR, api.WARNING) == ("error", "warning")
+    assert {"ERROR", "WARNING"} <= set(api.__all__)
 
 
 def test_warning_vocabulary_is_disjoint_from_errors() -> None:
