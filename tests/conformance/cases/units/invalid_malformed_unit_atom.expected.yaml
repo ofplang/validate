@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: malformed_unit_atom
+    path: "units.2s"
+notes: "A unit atom name must match UnitIdent (spec 28.1, 28.2), which is the v0 identifier grammar: it may not begin with a digit. A YAML integer key such as `1:` fails the same way, which is why the built-in dimensionless unit needs no rule forbidding its declaration -- it cannot be declared; that form is pinned in tests/test_units.py, since `expand` renders such a key as text and the conformance corpus holds the expand == safe_load invariant."

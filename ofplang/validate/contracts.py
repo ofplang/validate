@@ -40,16 +40,32 @@ from ofplang.validate.types import (
     TypeEnv,
     TypeExpr,
     TypeParseError,
+    Unit,
+    normalize_unit,
     parse_type,
     process_type_params,
     resolve_error,
     show_type,
+    show_unit,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 
 # A type that exists but is not determined here (see the module docstring). Not a
 # valid identifier, so it can never collide with the name of a real type.
 OPAQUE = "?"
+
+#: A subexpression with no unit of its own -- a numeric literal, or an expression
+#: every leaf of which is one (spec 28.11). It is read in the unit of whatever it
+#: is added to or compared with, exactly as a literal filling a port is read in
+#: the unit of that port (28.8). `-30.0` is a unary minus applied to a literal
+#: (9.2), so the flag has to propagate rather than being a property of `Lit`.
+LITERAL_UNIT = "<literal>"
+#: The unit is not knowable here, for the same reasons :data:`OPAQUE` is not.
+OPAQUE_UNIT = "<opaque>"
+
+#: A unit, or one of the two flags above. `Unit` is a tuple and the flags are
+#: strings, so the three are told apart by value.
+UnitOf = Unit | str
 
 
 class ContractError(Exception):
@@ -304,12 +320,14 @@ class ContractCtx:
     scope: str  # 'requires' | 'ensures'
 
 
-def _resolve_ref(path: list[str], ctx: ContractCtx) -> str:
-    """Resolve a `.view` reference to a primitive type name.
+def _resolve_ref(path: list[str], ctx: ContractCtx) -> tuple[str, UnitOf]:
+    """Resolve a `.view` reference to a primitive type name and its unit.
 
     Enforces reference scope and the explicit-`.view` requirement, then resolves
     the (optional) field against the port type's view schema. Returns the
-    primitive type name the reference denotes.
+    primitive type name the reference denotes, together with the unit of that
+    type (spec 28.11) -- the pair, because the two are resolved by one walk and
+    a second walk would be a second place for the answer to come from.
     """
     if len(path) < 3 or path[0] not in ("inputs", "outputs") or path[2] != "view":
         # Contracts may only reference explicit `.view` projections (spec 9.2).
@@ -347,7 +365,9 @@ def _type_param_domain(port_type: TypeExpr | None, ctx: ContractCtx) -> str | No
     return ctx.type_params.get(port_type.name)
 
 
-def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: ContractCtx) -> str:
+def _resolve_view_field(
+    port_type: TypeExpr | None, field: str | None, ctx: ContractCtx
+) -> tuple[str, UnitOf]:
     """Type of `<port>.view[.field]` (spec 7.4, 9.1).
 
     Primitive views are the scalar itself; `Array<T>.view.length` is Int; a
@@ -358,7 +378,7 @@ def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: Cont
     """
     if port_type is None:
         # The type pass already reported why; see the module docstring.
-        return OPAQUE
+        return OPAQUE, OPAQUE_UNIT
 
     domain = _type_param_domain(port_type, ctx)
 
@@ -366,10 +386,10 @@ def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: Cont
         # Bare `.view`: only meaningful (as a comparable scalar) for primitives.
         if isinstance(port_type, Atom):
             if port_type.name in PRIMITIVE_TYPES:
-                return port_type.name
+                return port_type.name, port_type.unit
             if domain == "data":
                 # This parameter may still be instantiated by a primitive (spec 9.1).
-                return OPAQUE
+                return OPAQUE, OPAQUE_UNIT
             if domain == "object":
                 raise ContractError(
                     errors.CONTRACT_INVALID_REFERENCE,
@@ -380,7 +400,9 @@ def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: Cont
 
     if isinstance(port_type, ArrayT):
         if field == "length":
-            return "Int"  # standard Array view field (spec 7.4)
+            # A length counts elements, so it is dimensionless whatever the
+            # element type is: `Array<Float[uL]>.view.length` is a plain Int.
+            return "Int", ()  # standard Array view field (spec 7.4)
         raise ContractError(errors.UNKNOWN_VIEW_FIELD, f"Array has no view field {field!r}")
 
     if isinstance(port_type, Atom):
@@ -390,7 +412,7 @@ def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: Cont
         if domain is not None:
             # Either domain can be instantiated by a type that declares a view
             # schema, so which fields exist is decided at instantiation (spec 9.1).
-            return OPAQUE
+            return OPAQUE, OPAQUE_UNIT
         schema = ctx.view_schemas.get(port_type.name, {})
         if field not in schema:
             raise ContractError(errors.UNKNOWN_VIEW_FIELD, f"unknown view field {field!r}")
@@ -399,8 +421,8 @@ def _resolve_view_field(port_type: TypeExpr | None, field: str | None, ctx: Cont
         # purposes we surface the primitive name (Array fields aren't comparable
         # scalars and would be a type error if used directly).
         if isinstance(ftype, Atom) and ftype.name in PRIMITIVE_TYPES:
-            return ftype.name
-        return "Array"  # non-scalar; downstream operators will reject it
+            return ftype.name, ftype.unit
+        return "Array", ()  # non-scalar; downstream operators will reject it
 
     raise ContractError(errors.CONTRACT_INVALID_REFERENCE, "unresolvable reference")
 
@@ -430,7 +452,7 @@ def _type_of(node, ctx: ContractCtx) -> str:
     if isinstance(node, Lit):
         return node.type_name
     if isinstance(node, Ref):
-        return _resolve_ref(node.path, ctx)
+        return _resolve_ref(node.path, ctx)[0]
     if isinstance(node, Unary):
         t = _type_of(node.operand, ctx)
         if node.op == "not":
@@ -472,6 +494,70 @@ def _type_of(node, ctx: ContractCtx) -> str:
                 raise ContractError(errors.CONTRACT_TYPE_ERROR, "'/' needs numeric operands")
             return "Float"  # division is Float whatever its operands are (spec 9.2)
     raise ContractError(errors.CONTRACT_TYPE_ERROR, "unrecognized expression")
+
+
+def _as_unit(unit: UnitOf) -> Unit:
+    """A literal expression counted as dimensionless (spec 28.11)."""
+    return () if isinstance(unit, str) else unit
+
+
+def _compose_units(left: Unit, right: Unit, sign: int) -> Unit:
+    """The unit of a product (`sign` 1) or a quotient (`sign` -1), spec 28.11."""
+    return normalize_unit(list(left) + [(name, sign * exp) for name, exp in right])
+
+
+def _unit_of(node, ctx: ContractCtx) -> UnitOf:
+    """Compute a node's unit, raising ContractError on a unit violation.
+
+    Run beside :func:`_type_of` rather than inside it, because that is what the
+    specification says the rules are: unit rules "are applied independently of
+    the base-type rules" and change no result base type (spec 28.11, 9.2). It
+    runs only after the base-type pass has succeeded, so a reference that fails
+    to resolve is reported once, there.
+    """
+    if isinstance(node, Lit):
+        # A numeric literal has no unit of its own; a Bool or String is
+        # dimensionless and stays that way.
+        return LITERAL_UNIT if node.type_name in _NUMERIC else ()
+    if isinstance(node, Ref):
+        return _resolve_ref(node.path, ctx)[1]
+    if isinstance(node, Unary):
+        # `not` yields Bool. Unary minus preserves the operand, the literal flag
+        # included: `-30.0` must still be readable in the unit it is compared to.
+        return () if node.op == "not" else _unit_of(node.operand, ctx)
+    if isinstance(node, Binary):
+        op = node.op
+        if op in ("and", "or"):
+            return ()
+        left = _unit_of(node.left, ctx)
+        right = _unit_of(node.right, ctx)
+        if left == OPAQUE_UNIT or right == OPAQUE_UNIT:
+            return OPAQUE_UNIT
+        # Past the guard above, a flag can only be LITERAL_UNIT, and a `str` is
+        # exactly that: a real unit is a tuple.
+        both_literal = isinstance(left, str) and isinstance(right, str)
+        if op in ("*", "/"):
+            # A literal operand of `*` or `/` contributes nothing to the unit; a
+            # product of two of them is still a literal expression (spec 28.11).
+            if both_literal:
+                return LITERAL_UNIT
+            return _compose_units(
+                _as_unit(left), _as_unit(right), -1 if op == "/" else 1
+            )
+        # Binary `+`, `-` and the comparisons: two unit-bearing operands must
+        # agree; one literal expression beside a unit-bearing operand imposes no
+        # condition and is read in its unit (spec 28.11).
+        additive = op in ("+", "-")
+        if both_literal:
+            return LITERAL_UNIT if additive else ()
+        if not isinstance(left, str) and not isinstance(right, str) and left != right:
+            raise ContractError(
+                errors.CONTRACT_UNIT_MISMATCH,
+                f"'{op}' relates {show_unit(left)} to {show_unit(right)}",
+            )
+        bearing = _as_unit(right) if isinstance(left, str) else _as_unit(left)
+        return bearing if additive else ()
+    return ()
 
 
 def _has_ref(node) -> bool:
@@ -555,6 +641,9 @@ def _check_expr(
         # bare reference through a type parameter that may yet be a Bool.
         if not _admits(result, {"Bool"}):
             raise ContractError(errors.CONTRACT_TYPE_ERROR, f"contract is {result}, not Bool")
+        # Units, on the types the base-type pass just resolved (spec 28.11). A
+        # unit mismatch is a validation error, not a runtime contract violation.
+        _unit_of(ast, ctx)
         # A statically determinable evaluation error is a validation error whether or
         # not the rest of the expression reads runtime values (spec 9.2), so this runs
         # for every contract -- and it leaves the fold below no `/0` to trip over.

@@ -1,0 +1,18 @@
+spec_version: "0.3"
+units:
+  s: {}
+  uL: {}
+  mL: {}
+processes:
+  hold:
+    kind: atomic
+    type_params:
+      T: {domain: data}
+    inputs:
+      x: {type: "T[s]", phase: data}
+    outputs: {}
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

@@ -1,10 +1,12 @@
 """Non-fatal duplicate mapping-key detection (spec 2.3, 2.4).
 
 Intent: v0 mappings have a defined shape at every position, so a repeated key is
-a validation error (spec 2.3). Two positions get a more specific code:
+a validation error (spec 2.3). Two positions get a more specific code, both of
+them positions the specification calls out by itself:
 
   * duplicate input/output *port* names -> ``duplicate_port_name`` (spec 2.4,
-    which states duplicate names within ``inputs`` / ``outputs`` are errors); and
+    which states duplicate names within ``inputs`` / ``outputs`` are errors);
+  * a duplicate unit atom name -> ``duplicate_unit_atom`` (spec 28.1); and
   * every other duplicate mapping key -> ``duplicate_key``.
 
 This runs on the fully import-expanded tree and *collects* findings rather than
@@ -32,6 +34,8 @@ def _child_ctx(ctx: str, key: str) -> str:
     The chain that reaches a port map is root -> ``processes`` value
     (process map) -> each process -> its ``inputs`` / ``outputs`` value.
     """
+    if ctx == "root" and key == "units":
+        return "units"  # value maps unit atom name -> declaration body
     if ctx == "root" and key == "processes":
         return "process_map"  # value maps process name -> process
     if ctx == "process_map":
@@ -43,7 +47,10 @@ def _child_ctx(ctx: str, key: str) -> str:
 
 def _walk(diags: Diagnostics, node: YNode | None, base: str, ctx: str) -> None:
     if isinstance(node, YMap):
-        code = errors.DUPLICATE_PORT_NAME if ctx == "ports" else errors.DUPLICATE_KEY
+        code = {
+            "ports": errors.DUPLICATE_PORT_NAME,
+            "units": errors.DUPLICATE_UNIT_ATOM,
+        }.get(ctx, errors.DUPLICATE_KEY)
         for dup in node.duplicate_keys():
             key_node = node.key_node(dup)
             diags.add(code, f"duplicate key {dup!r}", f"{base}.{dup}", at=key_node)

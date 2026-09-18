@@ -1,0 +1,34 @@
+spec_version: "0.3"
+units:
+  s: {}
+  min: {}
+  uL: {}
+  mL: {}
+  mg: {}
+processes:
+  min_to_s:
+    kind: atomic
+    inputs:
+      x: {type: "Float[min]", phase: data}
+    outputs:
+      y: {type: "Float[s]", phase: data}
+  wait:
+    kind: atomic
+    inputs:
+      duration: {type: "Float[s]", phase: data}
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      t: {type: "Float[min]", phase: data}
+    outputs: {}
+    body:
+      nodes:
+        - id: conv
+          process: min_to_s
+          bind: {x: {from: inputs.t}}
+        - id: w
+          process: wait
+          bind: {duration: {from: conv.y}}
+
+entry: main

@@ -1,0 +1,28 @@
+spec_version: "0.3"
+units:
+  s: {}
+  min: {}
+processes:
+  tick:
+    kind: atomic
+    inputs:
+      elapsed: {type: "Float[s]", phase: data}
+    outputs:
+      elapsed: {type: "Float[min]", phase: data}
+      again: {type: Bool, phase: data}
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      total: {type: "Float[min]", phase: data}
+    body:
+      nodes:
+        - id: loop
+          kind: do_while
+          process: tick
+          carry: {elapsed: {value: 0.0}}
+          condition: {output: again}
+          max_iterations: {value: 10}
+      returns:
+        total: {from: loop.elapsed}
+entry: main

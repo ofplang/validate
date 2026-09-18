@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: constraint_not_satisfied
+    path: "processes.main.body.nodes.n"
+notes: "Numeric is satisfied only by a numeric primitive whose unit is dimensionless (spec 7.3, 27 rule 50a): a process constrained by it cannot say what unit its result has. Float[1] would satisfy it, being Float (spec 28.5)."

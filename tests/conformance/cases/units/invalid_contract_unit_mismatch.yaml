@@ -1,0 +1,15 @@
+spec_version: "0.3"
+units:
+  uL: {}
+  mL: {}
+processes:
+  main:
+    kind: atomic
+    inputs:
+      small: {type: "Float[uL]", phase: data}
+      large: {type: "Float[mL]", phase: data}
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.small.view <= inputs.large.view"
+entry: main

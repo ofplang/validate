@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "Conversion is an ordinary atomic process whose arithmetic the IR trusts, as it trusts an objects.map (spec 28.6, 14.1). Every point at which a unit changes is a node, and visible."

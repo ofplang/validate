@@ -1,0 +1,15 @@
+spec_version: "0.3"
+units:
+  degC: {}
+processes:
+  main:
+    kind: atomic
+    inputs:
+      temp: {type: "Float[degC]", phase: data}
+    outputs: {}
+    contracts:
+      requires:
+        - expr: "inputs.temp.view >= -30.0"
+        - expr: "inputs.temp.view < 1.0 + 2.0"
+        - expr: "inputs.temp.view * 2.0 > inputs.temp.view"
+entry: main

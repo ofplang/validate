@@ -1,0 +1,6 @@
+outcome: invalid
+match: superset
+errors:
+  - code: unit_suffix_not_numeric
+    path: "processes.seal.inputs.plate.type"
+notes: "A suffix may sit only on Int or Float (spec 28.2). The grammar admits TypeAtom UnitSuffix?, so Plate[s] is well-formed and wrong, which is why it has its own code. A superset match: the unusable port type leaves the objects.map entry unresolvable too."

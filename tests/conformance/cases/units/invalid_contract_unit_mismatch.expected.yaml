@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: contract_unit_mismatch
+    path: "processes.main.contracts.requires[0]"
+notes: "A comparison requires equal unit normal forms, and v0 does not know that uL and mL measure the same quantity (spec 28.3, 28.11). A unit mismatch in a contract is a validation error, not a runtime contract violation."

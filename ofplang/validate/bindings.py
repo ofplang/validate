@@ -205,6 +205,17 @@ def _check_entry(
         return
     if inv is not None:
         inv.mismatched = True
+    if result is MatchResult.UNIT_MISMATCH:
+        # The base types agree; only the unit does not. A unit is never added,
+        # removed or converted implicitly (spec 28.5, 28.6), so what is missing is
+        # a conversion process, not a different port -- and the code says so.
+        diags.add(
+            errors.UNIT_MISMATCH,
+            f"value of type {show_type(got)} bound to a port of type {show_type(want)}",
+            path,
+            at=frm,
+        )
+        return
     if array_code is not None and isinstance(want, ArrayT) and not isinstance(got, ArrayT):
         diags.add(
             array_code,
@@ -479,8 +490,18 @@ def _check_composite(
                     and got != Atom("Int")
                     and not is_object_bearing(got, env, rigid)
                 ):
+                    # A constant slot is treated as an input port whose declared
+                    # type is the slot type (spec 11.2), so a unit where the slot
+                    # wants none is the same mistake as at any other binding and
+                    # gets the same code -- `Int` is the dimensionless `Int`
+                    # (spec 28.5).
+                    code = (
+                        errors.UNIT_MISMATCH
+                        if isinstance(got, Atom) and got.name == "Int" and got.unit
+                        else errors.BINDING_TYPE_MISMATCH
+                    )
                     diags.add(
-                        errors.BINDING_TYPE_MISMATCH,
+                        code,
                         f"max_iterations is {show_type(got)}, not Int",
                         f"{base}.nodes.{nid}.max_iterations",
                         at=frm,

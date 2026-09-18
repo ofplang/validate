@@ -1,0 +1,28 @@
+spec_version: "0.3"
+units:
+  s: {}
+processes:
+  tick:
+    kind: atomic
+    inputs:
+      c: {type: Int, phase: data}
+    outputs:
+      c: {type: Int, phase: data}
+      again: {type: Bool, phase: data}
+  main:
+    kind: composite
+    inputs:
+      budget: {type: "Int[s]", phase: run}
+    outputs:
+      total: {type: Int, phase: data}
+    body:
+      nodes:
+        - id: loop
+          kind: do_while
+          process: tick
+          carry: {c: {value: 0}}
+          condition: {output: again}
+          max_iterations: {from: inputs.budget}
+      returns:
+        total: {from: loop.c}
+entry: main

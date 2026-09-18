@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "Float[1] is Float (spec 28.5), so a plain Float value fills it. Writing the suffix still requires the units feature (spec 4.3), which is derived here."

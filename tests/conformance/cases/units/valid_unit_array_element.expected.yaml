@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "A unit suffix is written on the element type, not on the Array (spec 28.2)."

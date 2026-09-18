@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unit_mismatch
+    path: "processes.main.body.nodes.w.bind.duration"
+notes: "Float[s] is not Float, and a unit is never dropped implicitly (spec 28.5). Reported apart from a base-type mismatch because what is missing is a conversion process (spec 28.6), not a different port."

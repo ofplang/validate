@@ -1,0 +1,21 @@
+spec_version: "0.3"
+units:
+  s: {}
+  uL: {}
+  mL: {}
+types:
+  Plate: {domain: object}
+processes:
+  seal:
+    kind: atomic
+    inputs:
+      plate: {type: "Plate[s]", phase: data}
+    outputs:
+      plate: {type: Plate, phase: data}
+    objects:
+      map: {outputs.plate: inputs.plate}
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

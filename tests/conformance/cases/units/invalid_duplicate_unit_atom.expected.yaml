@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: duplicate_unit_atom
+    path: "<root>.units.s"
+notes: "Duplicate names within units are validation errors (spec 28.1), and the position has its own code for the reason duplicate_port_name does: the specification states the condition for it by itself."

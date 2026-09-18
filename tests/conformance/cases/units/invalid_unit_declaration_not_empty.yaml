@@ -1,0 +1,11 @@
+spec_version: "0.3"
+units:
+  s: {}
+  min: {scale: 60}
+processes:
+  main:
+    kind: atomic
+    inputs:
+      t: {type: "Float[min]", phase: data}
+    outputs: {}
+entry: main

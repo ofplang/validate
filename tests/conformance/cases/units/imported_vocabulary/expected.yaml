@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "A units section may be assembled through $import under the ordinary shallow structural merge of spec 3.2, which is the intended way to share a vocabulary across documents (spec 28.1). Atoms from the imported file resolve, and the conversion between two of them is an ordinary process (spec 28.6)."

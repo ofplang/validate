@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: missing_required_feature
+notes: "An explicit features section must include every feature the body requires (spec 4.1). A unit suffix, and a non-empty units section, each require units (spec 4.3)."

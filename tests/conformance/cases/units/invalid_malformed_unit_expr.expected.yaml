@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: malformed_unit_expr
+    path: "processes.weigh.inputs.conc.type"
+notes: "Whitespace is not allowed anywhere inside a unit suffix (spec 28.2). Distinct from malformed_type_expr: the reader is looking at a different part of what they wrote."

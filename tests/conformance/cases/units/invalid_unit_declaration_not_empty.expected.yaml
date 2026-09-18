@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: invalid_unit_declaration
+    path: "units.min"
+notes: "In v0 the only valid declaration body is an empty mapping: a unit atom carries no dimension, no scale and no relationship to any other atom (spec 28.1)."

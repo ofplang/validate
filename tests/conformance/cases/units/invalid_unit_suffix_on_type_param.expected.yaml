@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unit_suffix_not_numeric
+    path: "processes.hold.inputs.x.type"
+notes: "A unit suffix contains a unit expression, never a type expression, and a type parameter never carries one: v0 defines no way to abstract over a unit (spec 28.2, 28.12)."

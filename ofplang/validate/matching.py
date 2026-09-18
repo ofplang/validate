@@ -50,6 +50,10 @@ class MatchResult(Enum):
     OK = "ok"
     MISMATCH = "mismatch"
     CONFLICT = "conflict"
+    #: The base types agree and the units do not (spec 28.4). Distinct from
+    #: ``MISMATCH`` because the fix is different -- one converts, the other
+    #: rewires -- and this relation is the only place that knows which it saw.
+    UNIT_MISMATCH = "unit_mismatch"
 
 
 def domain_of(expr: TypeExpr, env: TypeEnv, rigid: dict[str, str]) -> str | None:
@@ -125,7 +129,15 @@ def _match(
     # may shadow neither a user type nor a built-in (spec 2.5).
     if not isinstance(source, Atom):
         return MatchResult.MISMATCH
-    return MatchResult.OK if target.name == source.name else MatchResult.MISMATCH
+    if target.name != source.name:
+        return MatchResult.MISMATCH
+    # A unit is part of the type, so a primitive matches only the same primitive
+    # with an equal unit normal form (spec 28.4). Reported apart from a base-type
+    # mismatch: a unit is never added, removed or converted implicitly (28.5), and
+    # the document has to say where the conversion happens.
+    if target.unit != source.unit:
+        return MatchResult.UNIT_MISMATCH
+    return MatchResult.OK
 
 
 #: A `where` constraint: TraitName<Param>, whitespace allowed only immediately inside
@@ -164,7 +176,11 @@ def satisfies(
     if concrete.name in rigid:
         return (trait, concrete.name) in rigid_where
     if trait == "Numeric":
-        return concrete.name in ("Int", "Float")
+        # Only a numeric primitive whose unit is dimensionless (spec 7.3, 28.12).
+        # A process constrained by `Numeric` cannot say what unit its result has,
+        # since v0 gives no way to abstract over one; `Float[1]` is `Float` and so
+        # still satisfies it (28.5).
+        return concrete.name in ("Int", "Float") and not concrete.unit
     return trait in implements.get(concrete.name, set())
 
 

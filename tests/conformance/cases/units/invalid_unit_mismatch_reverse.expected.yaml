@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: unit_mismatch
+notes: "Neither direction connects: Float is a Float whose unit is dimensionless, not one whose unit is unknown (spec 28.5)."

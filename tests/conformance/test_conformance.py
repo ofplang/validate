@@ -38,6 +38,7 @@ _CASES = discover_cases(CASES_ROOT) if CASES_ROOT.exists() else []
 # `OFPLANG_STRICT_TESTS=1` ignores this gate and holds the whole suite to the
 # full contract.
 IMPLEMENTED_CATEGORIES = {
+    "units",
     "shape",
     "metadata",
     "identifiers",

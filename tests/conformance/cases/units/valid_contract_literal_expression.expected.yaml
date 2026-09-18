@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "A subexpression whose every leaf is a numeric literal carries no unit and is read in the unit of the operand it is compared with (spec 28.11). Spec 9.2 parses -30.0 as unary minus applied to a literal, so the rule has to cover an expression and not just a literal token."

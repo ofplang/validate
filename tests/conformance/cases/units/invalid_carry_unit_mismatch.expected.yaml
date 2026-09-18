@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: carry_type_mismatch
+    path: "processes.main.body.nodes.loop.carry.elapsed"
+notes: "Structured carry compatibility requires the same name, type and phase (spec 16), and the type includes the unit (spec 28.7). The feature adds no rule here: the existing comparison is on the resolved type."

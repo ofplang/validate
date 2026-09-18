@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: undeclared_unit_atom
+    path: "processes.wait.inputs.duration.type"
+notes: "Every unit atom must be declared in the top-level units section, so a misspelling is reported where it is written rather than where the value is finally connected (spec 28.1)."

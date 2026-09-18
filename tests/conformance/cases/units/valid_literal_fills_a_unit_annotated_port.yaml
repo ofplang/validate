@@ -1,0 +1,24 @@
+spec_version: "0.3"
+units:
+  s: {}
+  min: {}
+  uL: {}
+  mL: {}
+  mg: {}
+processes:
+  wait:
+    kind: atomic
+    inputs:
+      duration: {type: "Float[s]", phase: data}
+    outputs: {}
+  main:
+    kind: composite
+    inputs: {}
+    outputs: {}
+    body:
+      nodes:
+        - id: w
+          process: wait
+          bind: {duration: {value: 30}}
+
+entry: main

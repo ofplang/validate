@@ -1,0 +1,24 @@
+spec_version: "0.3"
+units:
+  s: {}
+processes:
+  total:
+    kind: atomic
+    type_params:
+      T: {domain: data}
+    where:
+      - Numeric<T>
+    inputs:
+      x: {type: T, phase: data}
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      t: {type: "Float[s]", phase: data}
+    outputs: {}
+    body:
+      nodes:
+        - id: n
+          process: total
+          bind: {x: {from: inputs.t}}
+entry: main

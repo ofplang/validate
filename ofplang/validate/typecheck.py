@@ -17,9 +17,11 @@ from ofplang.validate.types import (
     ArrayArityError,
     TypeEnv,
     TypeParseError,
+    UnitExprError,
     parse_type,
     process_type_params,
     resolve_error,
+    unit_error,
 )
 from ofplang.validate.yamlnode import YMap, YNode, YScalar
 
@@ -46,6 +48,11 @@ def _check_type_field(
         return
     try:
         expr = parse_type(node.text)
+    except UnitExprError as exc:
+        # What is inside a unit suffix is its own kind of mistake (spec 28.2).
+        # Checked before TypeParseError, of which it is a subclass.
+        diags.add(errors.MALFORMED_UNIT_EXPR, str(exc), path, at=node)
+        return
     except ArrayArityError as exc:
         # A wrong Array arity gets its own code, distinct from a generally
         # malformed expression (spec 2.5). Checked before TypeParseError since it
@@ -58,6 +65,12 @@ def _check_type_field(
     code = resolve_error(expr, env, type_params)
     if code is not None:
         diags.add(code, f"unknown type in {node.text!r}", path, at=node)
+        return
+    # A unit suffix resolves against its own namespace (spec 28.1), so it is
+    # checked after the type atoms and separately from them.
+    code = unit_error(expr, env)
+    if code is not None:
+        diags.add(code, f"invalid unit in {node.text!r}", path, at=node)
 
 
 def _check_ports(

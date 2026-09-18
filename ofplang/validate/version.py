@@ -10,4 +10,4 @@ rules.
 from __future__ import annotations
 
 #: The revision of SPECIFICATION.md this implementation implements.
-SPEC_VERSION = "0.2"
+SPEC_VERSION = "0.3"

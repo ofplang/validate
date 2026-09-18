@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "Two type expressions denote the same type when their base types and unit normal forms agree (spec 28.3, 28.4): mg/mL and mg*mL^-1 both normalize to mL^-1*mg."

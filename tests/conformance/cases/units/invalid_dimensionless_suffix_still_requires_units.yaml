@@ -1,0 +1,9 @@
+spec_version: "0.3"
+features: []
+processes:
+  main:
+    kind: atomic
+    inputs:
+      t: {type: "Float[1]", phase: data}
+    outputs: {}
+entry: main

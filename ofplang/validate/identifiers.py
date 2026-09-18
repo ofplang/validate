@@ -35,7 +35,7 @@ RESERVED_NAMES = frozenset(
         "bind", "carry", "each", "args", "then", "else", "condition",
         "scheduling", "policies", "during", "object", "from", "to", "kind",
         "process", "phase", "type", "value", "script", "contracts", "requires",
-        "ensures", "behavior", "exhausted",
+        "ensures", "behavior", "exhausted", "units",
     }
 )
 

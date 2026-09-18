@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "A document depending on an experimental feature should list it explicitly even though 4.1 allows the set to be derived (spec 4.5)."

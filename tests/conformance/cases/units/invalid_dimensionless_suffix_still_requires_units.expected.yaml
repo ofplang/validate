@@ -1,0 +1,4 @@
+outcome: invalid
+errors:
+  - code: missing_required_feature
+notes: "Float[1] is the same type as Float (spec 28.5), but writing it is use of the syntax, and derivation reads the written text (spec 4.3)."

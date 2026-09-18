@@ -1,0 +1,16 @@
+spec_version: "0.3"
+units:
+  s: {}
+  uL: {}
+  mL: {}
+processes:
+  weigh:
+    kind: atomic
+    inputs:
+      conc: {type: "Float[mg / mL]", phase: data}
+    outputs: {}
+  main:
+    kind: atomic
+    inputs: {}
+    outputs: {}
+entry: main

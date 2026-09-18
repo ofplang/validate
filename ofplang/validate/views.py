@@ -16,9 +16,11 @@ from ofplang.validate.matching import is_primitive_only, literal_conforms
 from ofplang.validate.types import (
     TypeEnv,
     TypeParseError,
+    UnitExprError,
     is_object_bearing,
     parse_type,
     resolve_error,
+    unit_error,
 )
 from ofplang.validate.yamlnode import YMap, YScalar
 
@@ -62,6 +64,9 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
                 continue
             try:
                 expr = parse_type(type_node.text)
+            except UnitExprError as exc:
+                diags.add(errors.MALFORMED_UNIT_EXPR, str(exc), f"{base}.type", at=type_node)
+                continue
             except TypeParseError as exc:
                 diags.add(errors.MALFORMED_TYPE_EXPR, str(exc), f"{base}.type", at=type_node)
                 continue
@@ -72,6 +77,15 @@ def check_views(doc: YMap, diags: Diagnostics, env: TypeEnv) -> None:
                     f"{base}.type",
                     at=type_node,
                 )
+                continue
+            # A view field type may carry a unit where its base type is numeric
+            # (spec 28.9). `is_primitive_only` below admits it unchanged, and the
+            # static value is then checked against the base type, which is what
+            # 28.9 requires -- so only the suffix itself needs checking here.
+            unit_code = unit_error(expr, env)
+            if unit_code is not None:
+                diags.add(unit_code, f"invalid unit in {type_node.text!r}", f"{base}.type",
+                          at=type_node)
                 continue
 
             # Restriction: Object-bearing view fields are forbidden outright;

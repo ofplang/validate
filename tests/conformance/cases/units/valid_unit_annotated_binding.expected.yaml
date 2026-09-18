@@ -1,0 +1,3 @@
+outcome: valid
+warnings: []
+notes: "A unit is part of the type, so a Float[s] value binds to a Float[s] port under the ordinary rule of spec 11.1 -- the feature adds no rule here (spec 28.7)."

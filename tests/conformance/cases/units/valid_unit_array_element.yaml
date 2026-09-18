@@ -1,0 +1,25 @@
+spec_version: "0.3"
+units:
+  s: {}
+  min: {}
+  uL: {}
+  mL: {}
+  mg: {}
+processes:
+  measure_all:
+    kind: atomic
+    inputs:
+      volumes: {type: "Array<Float[uL]>", phase: data}
+    outputs: {}
+  main:
+    kind: composite
+    inputs:
+      vs: {type: "Array<Float[uL]>", phase: data}
+    outputs: {}
+    body:
+      nodes:
+        - id: m
+          process: measure_all
+          bind: {volumes: {from: inputs.vs}}
+
+entry: main

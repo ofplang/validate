@@ -63,6 +63,32 @@ REDECLARE_BUILTIN = "redeclare_builtin"
 TYPE_PARAM_SHADOW = "type_param_shadow"
 TYPE_FIELD_NOT_STRING = "type_field_not_string"
 
+# --- Units (spec 28, the `units` feature) ---------------------------------
+# A unit suffix is part of the type (28), so a mismatch is reported where the
+# types are compared -- but with its own code, because the fix is different from
+# a base-type mismatch: one converts, the other rewires. `matching` knows which
+# it saw, and is the only place that does.
+UNIT_MISMATCH = "unit_mismatch"
+CONTRACT_UNIT_MISMATCH = "contract_unit_mismatch"
+# A suffix that parses but sits on a type that cannot carry one (28.2). The
+# grammar admits `TypeAtom UnitSuffix?`, so `Cup[s]` is well-formed and wrong,
+# while `Array<Int>[s]` and `Float [s]` are not in the grammar at all and are
+# reported as `malformed_type_expr`.
+UNIT_SUFFIX_NOT_NUMERIC = "unit_suffix_not_numeric"
+# A suffix whose *unit* expression is malformed -- whitespace inside the
+# brackets, a zero or leading-zero exponent, `1` in a product (28.2). Separate
+# from `malformed_type_expr` for the reason `array_arity` is: the reader is
+# looking at a different part of what they wrote.
+MALFORMED_UNIT_EXPR = "malformed_unit_expr"
+UNDECLARED_UNIT_ATOM = "undeclared_unit_atom"
+# A `units` key that is not a `UnitIdent` (28.1, 28.2). A YAML integer key such
+# as `1:` arrives here rather than as a key-kind error: every key is carried as
+# text, and `1` simply fails the identifier grammar.
+MALFORMED_UNIT_ATOM = "malformed_unit_atom"
+DUPLICATE_UNIT_ATOM = "duplicate_unit_atom"
+# In v0 the only valid declaration body is an empty mapping (28.1).
+INVALID_UNIT_DECLARATION = "invalid_unit_declaration"
+
 # --- Structural imports (spec 3) ------------------------------------------
 IMPORT_CYCLE = "import_cycle"
 DUPLICATE_KEY_AFTER_IMPORT = "duplicate_key_after_import"

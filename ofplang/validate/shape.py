@@ -36,7 +36,8 @@ from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 # `processes` is semantically required (checked below). `description` is
 # optional metadata allowed at the document root (spec 2.7).
 _TOP_LEVEL_KEYS = {
-    "spec_version", "features", "traits", "types", "processes", "entry", "description",
+    "spec_version", "features", "units", "traits", "types", "processes", "entry",
+    "description",
 }
 
 # The two process kinds v0 defines (spec 10). An implementation-defined kind is
@@ -65,6 +66,9 @@ _COMPOSITE_KEYS = {
 # unknown key. Non-mapping declarations at these positions are left untouched:
 # closedness applies to mappings only, and their malformedness surfaces (or is
 # tolerated) in the type-resolution passes as today.
+#: The v0 identifier grammar (spec 2.4), for a `units` key.
+_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
 _TRAIT_KEYS = {"description"}
 _TYPE_KEYS = {"domain", "implements", "view", "description"}
 _VIEW_FIELD_KEYS = {"type", "value"}
@@ -403,6 +407,42 @@ def _check_descriptions(diags: Diagnostics, doc: YMap) -> None:
                 _check_description(diags, decl, f"{section}.{name}.description")
 
 
+def _check_units(diags: Diagnostics, doc: YMap) -> None:
+    """Close the top-level `units` section (spec 28.1).
+
+    Three conditions, each with its own code because each has its own fix: the
+    name must be a `UnitIdent`, and the declaration body must be an empty
+    mapping -- in v0 a unit atom is a nominal name and nothing else, so there is
+    nothing a body could carry. Duplicate names are reported by the duplicate-key
+    pass, which knows this position.
+
+    A YAML integer key such as `1:` arrives here as the text `"1"`, since every
+    key is carried as text, and simply fails the identifier grammar. That is why
+    the dimensionless unit needs no rule of its own: it cannot be declared.
+    """
+    units = _want_map(diags, doc.get("units"), "units", "units")
+    if units is None:
+        return
+    for name in units.keys():
+        path = f"units.{name}"
+        if _IDENT_RE.fullmatch(name) is None:
+            diags.add(
+                errors.MALFORMED_UNIT_ATOM,
+                f"unit atom name {name!r} is not an identifier",
+                path,
+                at=units.key_node(name),
+            )
+            continue
+        body = units.get(name)
+        if not isinstance(body, YMap) or body.entries:
+            diags.add(
+                errors.INVALID_UNIT_DECLARATION,
+                "a unit declaration body must be an empty mapping",
+                path,
+                at=body or units.key_node(name),
+            )
+
+
 def _check_types_and_traits(diags: Diagnostics, doc: YMap, mode: str) -> None:
     """Close the type/trait layer's declaration mappings (spec 2.3, 7.2, 7.4).
 
@@ -618,6 +658,7 @@ def check_shape(doc: YNode, diags: Diagnostics, mode: str) -> None:
     check_closed_map(diags, doc, _TOP_LEVEL_KEYS, "<root>", mode)
     _check_spec_version(diags, doc)
     _check_descriptions(diags, doc)
+    _check_units(diags, doc)
     _check_types_and_traits(diags, doc, mode)
 
     processes = doc.get("processes")

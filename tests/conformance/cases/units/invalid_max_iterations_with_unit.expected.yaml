@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unit_mismatch
+    path: "processes.main.body.nodes.loop.max_iterations"
+notes: "A constant slot is treated as an input port whose declared type is the slot type (spec 11.2), so the same code as any other binding. max_iterations is a constant slot of slot type Int (spec 11.2, 19), and Int is the dimensionless Int (spec 28.5), so a unit-annotated value does not fill it. The condition follows from the slot rules rather than from anything the feature adds (spec 28.7)."
