@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: literal_on_object_port
+notes: >-
+  data_via_state is judged on the target port's type. `cups` is Object-bearing,
+  so state is its section and only the literal is wrong; the empty Array literal
+  makes an empty Object-bearing collection as an `each` source (spec 11.1.1),
+  not as a binding to an Object-bearing port.

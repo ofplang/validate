@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: data_via_state
+    path: "processes.main.body.nodes.h.state.temperature"
+notes: >-
+  state is Object-bearing only, the counterpart of bind being Pure Data only
+  (spec 11, revision 0.4). The port's declared type decides; `temperature` is a
+  Float, so it is bound under bind.

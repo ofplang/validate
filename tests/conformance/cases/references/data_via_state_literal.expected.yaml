@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: data_via_state
+    path: "processes.main.body.nodes.h.state.temperature"
+notes: >-
+  The rule is judged on the port, not on the source, so a literal under state
+  for a Pure Data port is caught as a reference would be (spec 11, revision
+  0.4).

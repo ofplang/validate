@@ -394,6 +394,23 @@ def _check_composite(
                                 at=frm,
                             )
 
+                # `state` is Object-bearing only -- the counterpart of the rule
+                # above (spec 11, revision 0.4). It is judged on the target
+                # port's declared type, not on the source, so a literal is caught
+                # as well as a reference; a type parameter's domain decides, so it
+                # holds in a generic body too. Only an ordinary node has `state`,
+                # and a port whose type did not resolve is left alone: that is
+                # already an error, and "unknown" must not read as "Pure Data".
+                if section == "state" and kind is None and target is not None:
+                    port = target.inputs.get(portname)
+                    if port is not None and port.resolved and not port.object_bearing:
+                        diags.add(
+                            errors.DATA_VIA_STATE,
+                            f"Pure Data input port {portname!r} bound under state",
+                            epath,
+                            at=entry,
+                        )
+
         # `max_iterations` is a constant slot, not a binding section (spec 11.2,
         # 21.0). A slot is treated as an input port whose declared phase is the
         # slot's upper bound -- `run` for this one (spec 19 requirement 5) -- so

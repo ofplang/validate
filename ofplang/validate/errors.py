@@ -169,6 +169,11 @@ OBJECTS_PATH_NOT_FOUND = "objects_path_not_found"
 PURE_DATA_IN_OBJECTS = "pure_data_in_objects"
 DATA_INDEGREE = "data_indegree"
 OBJECT_VIA_BIND = "object_via_bind"
+# The counterpart of `object_via_bind` (spec 11, added in revision 0.4): a Pure
+# Data input port bound under `state`, by a reference or by a literal. Until 0.4
+# only the `bind` direction was a rule, so such a binding was valid -- and a tool
+# that read the section as the kind treated information as material.
+DATA_VIA_STATE = "data_via_state"
 
 # --- Transforms (spec 14.4) -----------------------------------------------
 UNKNOWN_TRANSFORM_KIND = "unknown_transform_kind"

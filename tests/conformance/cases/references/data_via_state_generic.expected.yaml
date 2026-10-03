@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: data_via_state
+    path: "processes.main.body.nodes.l.state.tag"
+notes: >-
+  `tag` is typed by D, whose declared domain is data, so it is a Pure Data port
+  whatever D is instantiated with and is bound under bind (spec 11, revision
+  0.4; spec 8).

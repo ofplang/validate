@@ -1,0 +1,38 @@
+# The rule is about the port, not the source: an Object-bearing port bound under
+# `state` with a literal is the literal's own error (a literal names no Object),
+# not data_via_state -- `state` is the right section for this port.
+spec_version: "0.4"
+types:
+  Cup:
+    domain: object
+processes:
+  stack:
+    kind: atomic
+    inputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    outputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    objects:
+      map:
+        outputs.cups: inputs.cups
+  main:
+    kind: composite
+    outputs:
+      cups:
+        type: Array<Cup>
+        phase: data
+    body:
+      nodes:
+        - id: s
+          process: stack
+          state:
+            cups:
+              value: []
+      returns:
+        cups:
+          from: s.cups
+entry: main

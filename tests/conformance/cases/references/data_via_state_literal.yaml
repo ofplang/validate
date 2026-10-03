@@ -1,0 +1,46 @@
+# A literal is Pure Data too: written under `state` for a Pure Data port, it is
+# the same error as a reference would be.
+spec_version: "0.4"
+types:
+  Cup:
+    domain: object
+processes:
+  heat:
+    kind: atomic
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+      temperature:
+        type: Float
+        phase: run
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  main:
+    kind: composite
+    inputs:
+      cup:
+        type: Cup
+        phase: data
+    outputs:
+      cup:
+        type: Cup
+        phase: data
+    body:
+      nodes:
+        - id: h
+          process: heat
+          state:
+            cup:
+              from: inputs.cup
+            temperature:
+              value: 60.0
+      returns:
+        cup:
+          from: h.cup
+entry: main

@@ -1,0 +1,38 @@
+# A port typed by a type parameter takes its section from the parameter's domain,
+# which the generic process declares, so the rule holds before any instantiation.
+spec_version: "0.4"
+features:
+  - generic_processes
+types:
+  Cup:
+    domain: object
+processes:
+  label:
+    kind: atomic
+    type_params:
+      D: { domain: data }
+    inputs:
+      cup: { type: Cup, phase: data }
+      tag: { type: D, phase: run }
+    outputs:
+      cup: { type: Cup, phase: data }
+    objects:
+      map:
+        outputs.cup: inputs.cup
+  main:
+    kind: composite
+    inputs:
+      cup: { type: Cup, phase: data }
+      tag: { type: String, phase: run }
+    outputs:
+      cup: { type: Cup, phase: data }
+    body:
+      nodes:
+        - id: l
+          process: label
+          state:
+            cup: { from: inputs.cup }
+            tag: { from: inputs.tag }
+      returns:
+        cup: { from: l.cup }
+entry: main
