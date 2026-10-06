@@ -1,0 +1,26 @@
+spec_version: "0.5"
+processes:
+  measure:
+    kind: atomic
+    inputs: {}
+    outputs:
+      od:
+        type: Float
+        phase: data
+  main:
+    kind: composite
+    inputs: {}
+    outputs:
+      od:
+        type: Float
+        phase: data
+    body:
+      nodes:
+        - id: m
+          process: measure
+      returns:
+        od:
+          from: m.od
+        odd:
+          from: m.od
+entry: main

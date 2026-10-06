@@ -266,6 +266,13 @@ BINDING_SOURCE_ARITY = "binding_source_arity"
 # `branch` the correspondence holds against each arm, so an argument naming a
 # port only one arm declares is reported here.
 BINDING_PORT_NOT_FOUND = "binding_port_not_found"
+# The same correspondence at a composite's other end (spec 12.3, revision 0.5): its
+# `returns` entries and its output ports, one to one, Pure Data outputs included. An
+# output with no entry gives no value -- a node binding it reads nothing -- and an
+# entry naming no output is returned nowhere (most often a misspelled name). Named
+# after the input-side pair: `binding_port_not_found` has `return_port_not_found`.
+OUTPUT_NOT_RETURNED = "output_not_returned"
+RETURN_PORT_NOT_FOUND = "return_port_not_found"
 
 # --- Binding type compatibility (spec 11.1) -------------------------------
 # A bound value's resolved type must match the port it is bound to. The three

@@ -497,6 +497,30 @@ def _check_composite(
                             at=frm,
                         )
 
+    # The returns entries and the composite's output ports correspond one to one
+    # (spec 12.3, 27 rule 21c, revision 0.5), Pure Data outputs as well as Object-
+    # bearing ones: the counterpart of a node's bindings and its target's inputs
+    # (spec 11). An Object-bearing output with no entry is also an incomplete
+    # skeleton, reported by the objects pass under its own rule (spec 13).
+    returned = set(returns.keys()) if isinstance(returns, YMap) else set()
+    for oname in sig.outputs:
+        if oname not in returned:
+            diags.add(
+                errors.OUTPUT_NOT_RETURNED,
+                f"output port {oname!r} of composite {pname!r} has no returns entry",
+                f"{base}.returns",
+                at=returns if isinstance(returns, YMap) else body,
+            )
+    if isinstance(returns, YMap):
+        for rname in returns.keys():
+            if rname not in sig.outputs:
+                diags.add(
+                    errors.RETURN_PORT_NOT_FOUND,
+                    f"returns entry {rname!r} names no output port of composite {pname!r}",
+                    f"{base}.returns.{rname}",
+                    at=returns.get(rname),
+                )
+
 
 def check_references(doc: YMap, diags: Diagnostics, sigs: dict[str, ProcSig]) -> None:
     processes = doc.get("processes")

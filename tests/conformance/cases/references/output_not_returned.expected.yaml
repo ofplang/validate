@@ -1,0 +1,11 @@
+outcome: invalid
+errors:
+  - code: output_not_returned
+    path: "processes.partial.body.returns"
+notes: >-
+  A composite's returns entries and its output ports correspond one to one
+  (spec 12.3, 27 rule 21c, revision 0.5), Pure Data outputs as well as
+  Object-bearing ones. `partial` declares `b` and returns only `a`, so `b` is a
+  value it says it gives and never does. Until revision 0.5 this case was
+  valid: the returns requirement was stated only for Object tracking
+  completeness (spec 13), and this file pinned that scope boundary.

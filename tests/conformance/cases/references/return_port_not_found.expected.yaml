@@ -1,0 +1,9 @@
+outcome: invalid
+errors:
+  - code: return_port_not_found
+    path: "processes.main.body.returns.odd"
+notes: >-
+  A returns entry names an output port of the composite (spec 12.3, 27 rule
+  21c, revision 0.5) -- the counterpart of a binding entry naming an input port
+  of its target (`binding_port_not_found`, spec 11). `odd` is declared nowhere:
+  a value returned nowhere, most often a misspelled output name.

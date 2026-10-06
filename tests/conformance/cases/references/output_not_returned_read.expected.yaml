@@ -1,0 +1,11 @@
+outcome: invalid
+errors:
+  - code: output_not_returned
+    path: "processes.wrap.body.returns"
+notes: >-
+  `main` returns `w.od`, an output `wrap` declares but does not return: the
+  reference resolves -- `od` is a port of `wrap` -- yet no value reaches it.
+  Revision 0.5 closes this at its source, `wrap` (spec 12.3): once every
+  composite returns every output it declares, a reference to a declared output
+  of a composite node always names a value, so the reading site needs no rule
+  of its own.

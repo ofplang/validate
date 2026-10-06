@@ -2,8 +2,12 @@ outcome: invalid
 errors:
   - code: incomplete_objects
     path: "processes.make_two.outputs.cup_b"
+  - code: output_not_returned
+    path: "processes.make_two.body.returns"
 notes: >-
   A composite derives its Object behavior from the body graph and returns
   (spec 10.2, 13). An Object-bearing output port with no returns entry has
   unknown provenance: the composite promises an Object nothing in the body
-  produces.
+  produces. Since revision 0.5 the same port also breaks the correspondence
+  of returns with output ports (spec 12.3), which every output is held to,
+  Object-bearing or not -- two rules, each reported under its own code.
