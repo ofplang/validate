@@ -1,2 +1,2 @@
 outcome: valid
-notes: "scheduling section requires scheduling_policies, which is declared (spec 4.3)."
+notes: "kind: map requires node_map, which is declared (spec 4.3)."

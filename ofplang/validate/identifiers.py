@@ -19,8 +19,10 @@ from ofplang.validate.yamlnode import YMap, YNode, YScalar, YSeq
 # The core identifier grammar (spec 2.4). Anchored so the whole name must match.
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-# Reserved keywords (spec 2.4). All but the last are structural keys and role
-# words that must not be reused as user-defined names anywhere. Built-in
+# Reserved keywords (spec 2.4). All but `exhausted` are structural keys and role
+# words that must not be reused as user-defined names anywhere. `scheduling`,
+# `policies`, `during`, `object` and `to` were keys of the `scheduling` section,
+# which revision 0.5 removed (spec 23); the specification keeps them reserved. Built-in
 # type/trait names (Bool/Int/Float/String/Array/Numeric) are handled separately
 # as `redeclare_builtin` in the type layer, so they are intentionally absent.
 #

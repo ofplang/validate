@@ -8,8 +8,8 @@ workflow IR with linear Object tracking. The language is defined in the
 [ofplang/spec](https://github.com/ofplang/spec) repository.
 
 The validator checks that a document is well-formed portable v0: structure and
-types, the feature model, linear Object tracking, structured nodes, contracts,
-and scheduling policies. It reports findings as stable **error codes** rather
+types, the feature model, linear Object tracking, structured nodes, and
+contracts. It reports findings as stable **error codes** rather
 than free text, so results are easy to consume in tests and tooling.
 
 ## Install

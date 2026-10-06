@@ -1,0 +1,6 @@
+mode: extension-tolerant
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.scheduling"
+notes: "scheduling has no x- prefix, so extension-tolerant mode does not accept it either (spec 23, 26)."

@@ -1,19 +1,30 @@
 spec_version: "0.0"
 features:
-  - scheduling_policies
+  - node_map
 processes:
+  inc:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      m:
+        type: Int
+        phase: data
   main:
     kind: composite
+    inputs:
+      ns:
+        type: Array<Int>
+        phase: data
     body:
-      nodes: []
+      nodes:
+        - id: mm
+          kind: map
+          process: inc
+          each:
+            n:
+              from: inputs.ns
       returns: {}
-    scheduling:
-      policies:
-        - during:
-            from: self.start
-            to: self.end
-          prefer:
-            kind: max_gap
-            value: 10
-            unit: min
 entry: main

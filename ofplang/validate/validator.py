@@ -118,7 +118,7 @@ def validate(
         duplicate mapping key at all, so ``duplicate_key`` never arises for it.
     mode:
         ``"strict"`` (portable v0) or ``"extension-tolerant"`` (accepts ``x-``
-        extension keys/features/preference kinds).
+        extension keys and features).
     base_dir:
         Optional base directory for resolving relative ``$import`` paths.
         Defaults to the directory containing ``source``.
@@ -147,7 +147,6 @@ def validate(
     from ofplang.validate import objects as objects_pass
     from ofplang.validate import phases as phases_pass
     from ofplang.validate import references as references_pass
-    from ofplang.validate import scheduling as scheduling_pass
     from ofplang.validate import script as script_pass
     from ofplang.validate import shape as shape_pass
     from ofplang.validate import traits as traits_pass
@@ -221,7 +220,6 @@ def validate(
         references_pass.check_references(root, diags, sigs)
         bindings_pass.check_bindings(root, diags, sigs, env)
         contracts_pass.check_contracts(root, diags, env)
-        scheduling_pass.check_scheduling(root, diags, mode, sigs)
         # Advisory, and last: the resource-bound condition of spec 1.1 is not a
         # validation rule, so it neither gates nor is gated by the passes above.
         bounds_pass.check_array_output_bounds(root, diags, sigs, env)

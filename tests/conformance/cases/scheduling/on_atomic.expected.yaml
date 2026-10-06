@@ -1,5 +1,0 @@
-outcome: invalid
-errors:
-  - code: scheduling_on_atomic
-    path: "processes.main.scheduling"
-notes: "The scheduling section is allowed only on composite processes (spec 23.3)."

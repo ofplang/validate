@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: bad_temporal_ref
-notes: "'collect.middle' is not a valid temporal reference; only .start/.end (spec 23.1)."

@@ -1,11 +1,11 @@
 """The Object skeleton of a process (spec 12.4).
 
-Intent: five parts of the specification were each describing one aspect of the
+Intent: four parts of the specification were each describing one aspect of the
 same structure -- where a process moves Object identity to. Completeness (13),
-the `object_identity_map` marker (15), a transform's correspondence (14.4.1), a
-branch's two arms agreeing (20.2), and what a scheduling policy follows (24.1)
-are all questions about it. This module is that structure, so those questions
-are answered by computing one thing rather than by five rules that must each be
+the `object_identity_map` marker (15), a transform's correspondence (14.4.1),
+and a branch's two arms agreeing (20.2) are all questions about it. This module
+is that structure, so those questions are answered by computing one thing rather
+than by four rules that must each be
 revisited whenever a node kind or a transform kind is added.
 
 A skeleton is a triple (12.4.1): a partial injection `phi` from the process's

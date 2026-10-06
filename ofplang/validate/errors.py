@@ -22,8 +22,8 @@ WRONG_VALUE_KIND = "wrong_value_kind"
 SECTION_NOT_VALID_FOR_KIND = "section_not_valid_for_kind"
 OBJECTS_ON_COMPOSITE = "objects_on_composite"
 # A `kind` naming something v0 does not define (spec 10, 21, 26). Split by where
-# it sits, following the same house rule as `unknown_transform_kind` and
-# `unknown_prefer_kind`: the fix is in a different place for each. Not accepted in
+# it sits, following the same house rule as `unknown_transform_kind`: the fix
+# is in a different place for each. Not accepted in
 # extension-tolerant mode either -- an implementation-defined kind makes the
 # document an extended dialect rather than portable v0 (spec 26).
 UNKNOWN_PROCESS_KIND = "unknown_process_kind"
@@ -225,15 +225,6 @@ NONCARRY_OBJECT_OUTPUT_IN_DO_WHILE = "noncarry_object_output_in_do_while"
 SCRIPT_OBJECT_PORT = "script_object_port"
 SCRIPT_HAS_OBJECTS = "script_has_objects"
 UNSUPPORTED_SCRIPT_LANGUAGE = "unsupported_script_language"
-
-# --- Scheduling policies (spec 23, 24) ------------------------------------
-SCHEDULING_ON_ATOMIC = "scheduling_on_atomic"
-GAP_WITH_OBJECT = "gap_with_object"
-TEMPERATURE_WITHOUT_OBJECT = "temperature_without_object"
-UNKNOWN_PREFER_KIND = "unknown_prefer_kind"
-BAD_TEMPORAL_REF = "bad_temporal_ref"
-NON_OBJECT_BEARING_TARGET = "non_object_bearing_target"
-MALFORMED_PREFER_PAYLOAD = "malformed_prefer_payload"
 
 # --- Entry process (spec 10.3) --------------------------------------------
 NO_ENTRY_PROCESS = "no_entry_process"

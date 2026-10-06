@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_key
+    path: "processes.main.scheduling"
+notes: "Revision 0.5 removed the scheduling section (spec 23); it is an unknown key on a composite (spec 2.3)."

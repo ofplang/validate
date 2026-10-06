@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: malformed_prefer_payload
-notes: "max_gap requires value and unit fields (spec 23.4.1)."

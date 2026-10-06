@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+  - code: unknown_feature
+    path: "features[0]"
+notes: "Revision 0.5 removed scheduling_policies (spec 23); it is no longer a v0 feature name (spec 4.2, rule 13)."

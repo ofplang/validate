@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: non_object_bearing_target
-notes: "object.from 'inputs.count' is Pure Data, not Object-bearing (spec 24.1)."

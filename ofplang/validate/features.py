@@ -2,9 +2,8 @@
 
 Intent: `features` is canonical when written but derivable when omitted. Feature
 derivation is deliberately syntactic (spec 4.3) — it reads node `kind` values, a
-`type_params` section, a `script.language: python`, the presence of a
-`scheduling` section, and a unit suffix in the written text of a `type` — so it
-is cheap and unambiguous to check. When `features`
+`type_params` section, a `script.language: python`, and a unit suffix in the
+written text of a `type` — so it is cheap and unambiguous to check. When `features`
 is present it must list every derived (required) feature and may list only
 v0-defined names.
 """
@@ -26,7 +25,8 @@ V0_FEATURES = frozenset(
         "node_branch",
         "generic_processes",
         "python_script_processes",
-        "scheduling_policies",
+        # `scheduling_policies` was removed in revision 0.5 (spec 23): naming it
+        # is now `unknown_feature`, like any other name v0 does not define.
         # Experimental (spec 4.5): an ordinary feature here, with no migration
         # path promised across a revision.
         "units",
@@ -113,10 +113,6 @@ def derive_required(doc: YMap) -> set[str]:
             lang = script.get("language")
             if isinstance(lang, YScalar) and lang.text == "python":
                 required.add("python_script_processes")
-
-        # A scheduling section requires scheduling_policies (spec 4.3).
-        if proc.get("scheduling") is not None:
-            required.add("scheduling_policies")
 
         # A unit suffix on any port type requires units (spec 4.3, 28.2).
         if _has_unit_suffix(proc.get("inputs")) or _has_unit_suffix(proc.get("outputs")):

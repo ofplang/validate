@@ -1,4 +1,0 @@
-outcome: invalid
-errors:
-  - code: unknown_prefer_kind
-notes: "'bogus' is not a v0 preference kind (spec 23.4)."

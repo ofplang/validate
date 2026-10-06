@@ -57,7 +57,6 @@ IMPLEMENTED_CATEGORIES = {
     "script",
     "nodes",
     "contracts",
-    "scheduling",
     "references",
     "aggregation",
     "bindings",

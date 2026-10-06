@@ -136,7 +136,6 @@ Codes are compared as **sets** (order- and duplicate-insensitive).
 | `bindings/`   | 11.1          | binding type compatibility, `returns` typing, literal values |
 | `nodes/`      | 16-21         | map/fold/do_while/branch output modes and defaults |
 | `script/`     | 22            | python-only, pure-data restriction |
-| `scheduling/` | 23, 24        | placement, temporal refs, object targets, `prefer` schema |
 | `entry/`      | 10.3          | entry resolution, acyclic dependency |
 | `extensions/` | 26            | `x-` keys/features in both modes |
 | `aggregation/`| —             | one document breaking several rules at once, to pin that findings are collected rather than stopping at the first |

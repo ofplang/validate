@@ -110,9 +110,8 @@ class YScalar(YNode):
         """Whether this is a numeric scalar whose value is finite.
 
         v0 excludes NaN and infinity everywhere a number is written: a static
-        view value must be a finite numeric scalar (spec 7.4) and so must a
-        scheduling preference value (spec 23.4). The exclusion lives here rather
-        than at each call site because the two ways to write a non-finite float
+        view value must be a finite numeric scalar (spec 7.4). The exclusion
+        lives here rather than at a call site because the two ways to write a non-finite float
         are easy to miss individually: YAML spells them ``.inf`` / ``-.inf`` /
         ``.nan`` (any capitalisation), and a decimal that overflows the double
         range -- ``1.0e999`` -- resolves to infinity as well.

@@ -1,3 +1,0 @@
-mode: extension-tolerant
-outcome: valid
-notes: "x- extension preference kinds are accepted in extension-tolerant mode (spec 23.4, 26)."

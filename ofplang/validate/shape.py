@@ -44,18 +44,19 @@ _TOP_LEVEL_KEYS = {
 # not accepted, in either mode (spec 26), so this is not mode-dependent.
 _PROCESS_KINDS = {"atomic", "composite"}
 
-# Per-kind allowed process keys. The *misplaced* section variants — `objects`
-# on a composite, `scheduling` on an atomic — get their own specific codes
-# (spec 10.2, 23.3). To avoid also reporting them as generic unknown keys, both
-# section names are included in *both* allowed sets: placement is judged by the
-# dedicated checks below, not by the closed-key check.
+# Per-kind allowed process keys. The *misplaced* section variant — `objects`
+# on a composite — gets its own specific code (spec 10.2). To avoid also
+# reporting it as a generic unknown key, the section name is included in *both*
+# allowed sets: placement is judged by the dedicated check below, not by the
+# closed-key check. `scheduling` is in neither: revision 0.5 removed it (spec
+# 23), so it is an unknown key on either kind.
 # `description` is optional metadata allowed on a process definition (spec 2.7).
 _ATOMIC_KEYS = {
-    "kind", "inputs", "outputs", "objects", "scheduling", "script",
+    "kind", "inputs", "outputs", "objects", "script",
     "type_params", "where", "behavior", "contracts", "description",
 }
 _COMPOSITE_KEYS = {
-    "kind", "inputs", "outputs", "body", "objects", "scheduling",
+    "kind", "inputs", "outputs", "body", "objects",
     "type_params", "where", "behavior", "contracts", "description",
 }
 
@@ -252,8 +253,7 @@ def check_closed_map(
     """Report keys not in ``allowed`` at a closed mapping position.
 
     Public because closedness is enforced wherever a position is already being
-    walked: the scheduling pass closes the policy mappings it visits rather than
-    making this module walk them a second time.
+    walked, so that another pass need not walk a position a second time.
     """
     for key in node.keys():
         # Point the diagnostic at the offending key node itself.
@@ -498,22 +498,15 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
             at=kind_node,
         )
 
-    # Placement rules with dedicated codes: objects only on atomic (spec 14),
-    # scheduling only on composite (spec 23.3). Emit the specific code and rely
-    # on the allowed-set check to skip re-reporting these keys as unknown.
+    # Placement rule with a dedicated code: objects only on atomic (spec 14).
+    # Emit the specific code and rely on the allowed-set check to skip
+    # re-reporting the key as unknown.
     if kind == "composite" and proc.get("objects") is not None:
         diags.add(
             errors.OBJECTS_ON_COMPOSITE,
             "objects is atomic-only",
             f"{base}.objects",
             at=proc.get("objects"),
-        )
-    if kind == "atomic" and proc.get("scheduling") is not None:
-        diags.add(
-            errors.SCHEDULING_ON_ATOMIC,
-            "scheduling is composite-only",
-            f"{base}.scheduling",
-            at=proc.get("scheduling"),
         )
 
     # Closed-key check against the kind's allowed set. Unknown `kind` values are
@@ -551,7 +544,7 @@ def _check_process(diags: Diagnostics, pname: str, proc: YNode | None, mode: str
                 check_closed_map(diags, port, _PORT_KEYS, path, mode)
 
     # The remaining closed mappings a process may carry. Placement (which kind may
-    # carry `objects` / `scheduling` / `body`) is judged above; this only asks what
+    # carry `objects` / `body`) is judged above; this only asks what
     # keys the section itself may hold, which does not depend on the kind.
     objects = _want_map(diags, proc.get("objects"), f"{base}.objects", "objects")
     if objects is not None:
