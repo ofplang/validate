@@ -120,6 +120,8 @@ _CONTRACT_ENTRY_KEYS = {"expr"}                                    # spec 9
 _SCRIPT_KEYS = {"language", "code"}                                # spec 22
 _BODY_KEYS = {"nodes", "returns"}                                  # spec 10.2
 _OUTPUTS_ENTRY_KEYS = {"mode"}                                     # spec 21
+# The node kinds that take an `outputs` section (spec 18.1, 19.1, 20.1).
+_OUTPUTS_KINDS = {kind for kind, keys in _NODE_ALLOWED.items() if "outputs" in keys}
 _ARM_KEYS = {"process"}                                            # spec 20
 # A source entry carries exactly one of from/value (spec 2.6.6); the arity is the
 # reference pass's concern, the key set is this one's. `body.returns` entries are
@@ -200,14 +202,26 @@ def _check_node_interior(diags: Diagnostics, item: YMap, npath: str, mode: str) 
             if entry is not None:
                 check_closed_map(diags, entry, _SOURCE_ENTRY_KEYS, path, mode)
 
-    # Output-shaping entries: one `mode` per exposed port (spec 21).
+    # Output-shaping entries: one `mode` per exposed port (spec 21), and it is
+    # required -- the mode is what says whether the port is exposed and as what
+    # type, so an entry without one says neither. Required only where the node
+    # kind takes an `outputs` section at all: on any other kind the section is
+    # already reported as misplaced, and its entries are not read.
     outs = _want_map(diags, item.get("outputs"), f"{npath}.outputs", "outputs")
     if outs is not None:
         for portname in outs.keys():
             path = f"{npath}.outputs.{portname}"
             entry = _want_map(diags, outs.get(portname), path, "an output-shaping entry")
-            if entry is not None:
-                check_closed_map(diags, entry, _OUTPUTS_ENTRY_KEYS, path, mode)
+            if entry is None:
+                continue
+            check_closed_map(diags, entry, _OUTPUTS_ENTRY_KEYS, path, mode)
+            if nk in _OUTPUTS_KINDS and "mode" not in entry.keys():
+                diags.add(
+                    errors.MISSING_REQUIRED_KEY,
+                    f"output {portname!r} requires 'mode'",
+                    f"{path}.mode",
+                    at=entry,
+                )
 
     # `condition` is shaped by the node kind, so an unknown kind has no shape to
     # check against and is left alone -- the kind itself is already reported.

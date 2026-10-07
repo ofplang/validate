@@ -1,0 +1,33 @@
+spec_version: "0.0"
+features: [node_branch]
+processes:
+  low:
+    kind: atomic
+    inputs:
+      x: { type: Int, phase: data }
+    outputs:
+      r: { type: Int, phase: data }
+  high:
+    kind: atomic
+    inputs:
+      x: { type: Int, phase: data }
+    outputs:
+      r: { type: Int, phase: data }
+  main:
+    kind: composite
+    inputs:
+      x: { type: Int, phase: data }
+      flag: { type: Bool, phase: data }
+    outputs: {}
+    body:
+      nodes:
+        - id: pick
+          kind: branch
+          condition: { from: inputs.flag }
+          args: { x: { from: inputs.x } }
+          then: { process: high }
+          else: { process: low }
+          outputs:
+            r: {}
+      returns: {}
+entry: main

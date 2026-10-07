@@ -50,7 +50,7 @@ def _check_output_modes(
 ) -> None:
     """Every listed output mode must be one the kind allows (spec 18.1/19.1/20.1).
 
-    A missing mode is left to the (deferred) fully-explicit-listing rule; only a
+    A missing mode is the shape pass's (`missing_required_key`, spec 21); only a
     present-but-unrecognized mode word is reported here.
     """
     for oname in outputs.keys():

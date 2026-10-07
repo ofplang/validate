@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+    path: processes.main.body.nodes[0].outputs.note.mode
+notes: >
+  An entry of a fold's `outputs` lists the port and says nothing about it. The mode
+  is what says whether the port is exposed and as what type (spec 21), and a listed
+  output names carry, collect or drop (spec 18.1 rule 9).

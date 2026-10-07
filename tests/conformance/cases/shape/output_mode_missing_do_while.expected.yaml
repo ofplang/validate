@@ -1,0 +1,7 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+    path: processes.main.body.nodes[0].outputs.go.mode
+notes: >
+  An entry of a do_while's `outputs` with no mode (spec 21, 19.1 rule 15): listing
+  the condition output does not say whether it is collected or dropped.

@@ -1,0 +1,8 @@
+outcome: invalid
+errors:
+  - code: missing_required_key
+    path: processes.main.body.nodes[0].outputs.r.mode
+notes: >
+  An entry of a branch's `outputs` with no mode (spec 21): a listed Data output is
+  neither exposed as common nor dropped. (An unlisted one is dropped, spec 20.1
+  rule 8; a listed one says which.)
