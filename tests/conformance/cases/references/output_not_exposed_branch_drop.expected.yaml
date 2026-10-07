@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.r
+notes: 'A branch output listed with mode: drop is not exposed (spec 20.1, 21).'

@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.note
+notes: 'A fold output listed with mode: drop is not exposed (spec 18.1, 21), so returning
+  it names an output the node does not make visible.'

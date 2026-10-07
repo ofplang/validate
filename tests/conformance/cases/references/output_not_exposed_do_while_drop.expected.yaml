@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.go
+notes: 'A do_while output listed with mode: drop is not exposed (spec 19.1, 21).'

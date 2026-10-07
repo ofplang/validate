@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.r
+notes: Without an outputs section a branch exposes no Data output (spec 20.3).

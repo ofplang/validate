@@ -1,0 +1,53 @@
+spec_version: '0.5'
+processes:
+  step:
+    kind: atomic
+    inputs:
+      acc:
+        type: Int
+        phase: data
+      x:
+        type: Int
+        phase: data
+    outputs:
+      acc:
+        type: Int
+        phase: data
+      note:
+        type: String
+        phase: data
+  main:
+    kind: composite
+    inputs:
+      xs:
+        type: Array<Int>
+        phase: data
+    outputs:
+      acc:
+        type: Int
+        phase: data
+      note:
+        type: String
+        phase: data
+    body:
+      nodes:
+      - id: F
+        kind: fold
+        process: step
+        carry:
+          acc:
+            value: 0
+        each:
+          x:
+            from: inputs.xs
+        outputs:
+          acc:
+            mode: carry
+          note:
+            mode: drop
+      returns:
+        acc:
+          from: F.acc
+        note:
+          from: F.note
+entry: main

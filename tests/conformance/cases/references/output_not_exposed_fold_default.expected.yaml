@@ -1,0 +1,5 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.note
+notes: Without an outputs section a fold drops its non-carry Pure Data outputs (spec 18.2).

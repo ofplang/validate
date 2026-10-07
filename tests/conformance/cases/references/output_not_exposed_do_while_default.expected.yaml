@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+- code: output_not_exposed
+  path: processes.main.body.returns.go
+notes: Without an outputs section a do_while drops its non-carry Data outputs, the condition
+  output included (spec 19.2); only exhausted is exposed besides the carry.

@@ -250,6 +250,11 @@ NODE_DEPENDENCY_CYCLE = "node_dependency_cycle"
 # reference. Anything that does not parse at all is malformed_reference.
 MALFORMED_REFERENCE = "malformed_reference"
 UNKNOWN_REFERENCE = "unknown_reference"
+# A reference to an output the node's target has but the node does not expose
+# (spec 18-21): one its `outputs` section drops, or one the kind's default drops
+# -- a non-carry Data output of a fold or do_while, a Data output of a branch.
+# Not `unknown_reference`: the name exists, and the fix is to expose it.
+OUTPUT_NOT_EXPOSED = "output_not_exposed"
 BINDING_SOURCE_ARITY = "binding_source_arity"
 # The other direction of the degree rules: a binding entry that names no input
 # port of the target process (spec 11). `data_indegree` and the Object input

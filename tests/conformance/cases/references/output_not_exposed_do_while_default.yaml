@@ -1,0 +1,42 @@
+spec_version: '0.5'
+processes:
+  step:
+    kind: atomic
+    inputs:
+      n:
+        type: Int
+        phase: data
+    outputs:
+      n:
+        type: Int
+        phase: data
+      go:
+        type: Bool
+        phase: data
+  main:
+    kind: composite
+    outputs:
+      n:
+        type: Int
+        phase: data
+      go:
+        type: Bool
+        phase: data
+    body:
+      nodes:
+      - id: L
+        kind: do_while
+        process: step
+        carry:
+          n:
+            value: 0
+        condition:
+          output: go
+        max_iterations:
+          value: 3
+      returns:
+        n:
+          from: L.n
+        go:
+          from: L.go
+entry: main

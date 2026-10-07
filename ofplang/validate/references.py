@@ -63,6 +63,99 @@ def _node_output_names(node: YMap, sigs: dict[str, ProcSig]) -> set[str]:
     return names
 
 
+_EXPOSING_MODES = {"fold": {"carry", "collect"}, "do_while": {"carry", "collect"},
+                   "branch": {"common"}}
+_ALLOWED_MODES = {"fold": {"carry", "collect", "drop"}, "do_while": {"carry", "collect", "drop"},
+                  "branch": {"common", "drop"}}
+
+
+def _node_exposed_names(node: YMap, sigs: dict[str, ProcSig]) -> set[str] | None:
+    """The outputs a node makes visible to its siblings (spec 18-21), or None where
+    that cannot be said and every name its target has is taken as visible.
+
+    An ordinary node and a `map` expose all their target's outputs. A `fold` /
+    `do_while` exposes what its `outputs` section lists as carry or collect --
+    without one, its carry outputs (18.2, 19.2) -- and a `do_while` its reserved
+    `exhausted` as well (19.3). A `branch` exposes what its section lists as
+    common -- without one, the Object-bearing outputs common to both arms (20.3).
+
+    None where the node's own output rules are already broken: a listed entry with
+    no mode or an invalid one, an Object-bearing output not exposed, a listing that
+    is not complete. What the node exposes then is the thing being refused, and a
+    reference to one of its outputs is that refusal's consequence, not a second
+    mistake to report."""
+    kind_node = node.get("kind")
+    kind = kind_node.text if isinstance(kind_node, YScalar) else None
+    if kind not in _EXPOSING_MODES:
+        return None  # ordinary / map: everything the target has
+    section = node.get("outputs")
+    carry_node = node.get("carry")
+    carry = set(carry_node.keys()) if isinstance(carry_node, YMap) else set()
+
+    if kind == "branch":
+        arms = [node.get(a) for a in ("then", "else")]
+        procs = [a.get("process") if isinstance(a, YMap) else None for a in arms]
+        then_sig = sigs.get(procs[0].text) if isinstance(procs[0], YScalar) else None
+        if then_sig is None:
+            return None
+        if isinstance(arms[1], YMap):
+            else_sig = sigs.get(procs[1].text) if isinstance(procs[1], YScalar) else None
+            if else_sig is None:
+                return None
+            else_obj = {n for n, s in else_sig.outputs.items() if s.object_bearing}
+        else:  # the implicit identity arm re-exposes each Object-bearing argument
+            args = node.get("args")
+            names = args.keys() if isinstance(args, YMap) else []
+            else_obj = {n for n in names
+                        if n in then_sig.inputs and then_sig.inputs[n].object_bearing}
+        then_obj = {n for n, s in then_sig.outputs.items() if s.object_bearing}
+        if then_obj != else_obj:
+            return None  # a one-sided Object output: refused (20.1 rule 9)
+        if not isinstance(section, YMap):
+            return set(then_obj)
+        modes = _listed_modes(section, _ALLOWED_MODES[kind])
+        if modes is None or any(modes.get(n) != "common" for n in then_obj):
+            return None
+        return {n for n, m in modes.items() if m == "common"}
+
+    # fold / do_while
+    target_ref = node.get("process")
+    target = sigs.get(target_ref.text) if isinstance(target_ref, YScalar) else None
+    if target is None:
+        return None
+    noncarry_obj = {n for n, s in target.outputs.items() if s.object_bearing} - carry
+    if isinstance(section, YMap):
+        if DO_WHILE_RESERVED_OUTPUT in section.keys() and kind == "do_while":
+            return None  # listing the reserved output is refused (19.3)
+        modes = _listed_modes(section, _ALLOWED_MODES[kind])
+        if modes is None or set(modes) != set(target.outputs):
+            return None  # an entry without a valid mode, or a listing not complete
+        if any(modes[c] != "carry" for c in carry if c in modes):
+            return None
+        if any(modes[n] not in ("carry", "collect") for n in noncarry_obj):
+            return None
+        exposed = {n for n, m in modes.items() if m in _EXPOSING_MODES[kind]}
+    else:
+        if noncarry_obj:
+            return None  # refused: needs a section (18.2), or forbidden (19.2)
+        exposed = set(target.outputs) & carry
+    if kind == "do_while":
+        exposed.add(DO_WHILE_RESERVED_OUTPUT)
+    return exposed
+
+
+def _listed_modes(section: YMap, allowed: set[str]) -> dict[str, str] | None:
+    """Each listed output's mode, or None if any entry has no mode allowed here."""
+    modes: dict[str, str] = {}
+    for name in section.keys():
+        entry = section.get(name)
+        mode = entry.get("mode") if isinstance(entry, YMap) else None
+        if not (isinstance(mode, YScalar) and mode.text in allowed):
+            return None
+        modes[name] = mode.text
+    return modes
+
+
 # The binding sections that supply a target's input ports, per node kind
 # (spec 11, 21.0). `None` is an ordinary node. Sections outside a kind's set are
 # reported by the shape pass, so a stray one here simply supplies nothing.
@@ -272,18 +365,36 @@ def _check_composite(
     input_names = set(sig.inputs)
     node_out: set[tuple[str, str]] = set()
     nodes_by_id: dict[str, YMap] = {}
+    # What each node exposes (spec 18-21), where that can be said; see
+    # `_node_exposed_names`. `node_out` is what exists at all.
+    node_exposed: dict[str, set[str] | None] = {}
     for node in node_items:
         id_node = node.get("id")
         if isinstance(id_node, YScalar):
             nodes_by_id[id_node.text] = node
             for oname in _node_output_names(node, sigs):
                 node_out.add((id_node.text, oname))
+            node_exposed[id_node.text] = _node_exposed_names(node, sigs)
 
     def _resolves(ref: tuple[str, str]) -> bool:
         owner, name = ref
         if owner == "inputs":
             return name in input_names
         return (owner, name) in node_out
+
+    def _hidden(ref: tuple[str, str]) -> bool:
+        """A resolvable reference to an output its node does not expose."""
+        exposed = node_exposed.get(ref[0])
+        return exposed is not None and ref[1] not in exposed
+
+    def _not_exposed(ref: tuple[str, str], text: str, path: str, at) -> None:
+        diags.add(
+            errors.OUTPUT_NOT_EXPOSED,
+            f"{text!r} names an output node {ref[0]!r} does not expose; its outputs "
+            "section drops it, or the node kind drops it by default (spec 18-21)",
+            path,
+            at=at,
+        )
 
     # The body's node dependency graph must be acyclic (spec 10.2, 27 rule 21b).
     # A different graph from the one `recursive_process_dependency` reports:
@@ -334,6 +445,9 @@ def _check_composite(
             return
         if not _resolves(ref):
             diags.add(errors.UNKNOWN_REFERENCE, f"unresolved reference {frm.text!r}", path, at=frm)
+            return
+        if _hidden(ref):
+            _not_exposed(ref, frm.text, path, frm)
             return
         # Phase-flow: source phase must be earlier-or-equal to the target port.
         if target_input_phase is not None:
@@ -461,6 +575,8 @@ def _check_composite(
                             f"{base}.nodes.{nid}.condition",
                             at=frm,
                         )
+                    elif _hidden(ref):
+                        _not_exposed(ref, frm.text, f"{base}.nodes.{nid}.condition", frm)
 
         # A node's binding entries and its target's input ports are in one-to-one
         # correspondence (spec 11), whatever the node kind: every input port is
@@ -496,6 +612,8 @@ def _check_composite(
                             f"{base}.returns.{rname}",
                             at=frm,
                         )
+                    elif _hidden(ref):
+                        _not_exposed(ref, frm.text, f"{base}.returns.{rname}", frm)
 
     # The returns entries and the composite's output ports correspond one to one
     # (spec 12.3, 27 rule 21c, revision 0.5), Pure Data outputs as well as Object-

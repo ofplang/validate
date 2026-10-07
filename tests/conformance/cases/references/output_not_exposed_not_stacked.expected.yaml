@@ -1,0 +1,6 @@
+outcome: invalid
+errors:
+- code: invalid_output_mode
+notes: 'The outputs section itself is refused, so what the node exposes is the thing being
+  refused: returning one of its outputs is not reported a second time (output_not_exposed)
+  on top of it.'
